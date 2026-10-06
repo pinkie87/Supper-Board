@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from . import i18n, llm, notify, planner, recipes, scheduler
+from . import i18n, llm, notify, photos, planner, recipes, scheduler
 from .config import Settings, settings as default_settings
 from .i18n import T
 from .seed import seed
@@ -29,14 +29,17 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     i18n.set_default(settings.language)
     store = Store(settings.db_path)
     seed(store, settings.language)
+    photo_worker = photos.PhotoWorker(store, settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         store.attach_loop(asyncio.get_running_loop())
         task = asyncio.create_task(scheduler.run(store, settings)) if run_scheduler else None
+        photo_task = asyncio.create_task(photo_worker.run())
         yield
-        if task:
-            task.cancel()
+        for t in (task, photo_task):
+            if t:
+                t.cancel()
         store.close()
 
     app = FastAPI(title="Supper Board", lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -95,7 +98,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         return {
             "storeName": settings.store_name, "storeUrl": settings.store_url, "storeSearchUrl": settings.store_search_url,
             "llm": settings.llm_provider if settings.llm_enabled else "none",
-            "llmLabel": {"claude": "Claude", "ollama": "Ollama"}.get(settings.llm_provider, ""),
+            "llmLabel": {"claude": "Claude", "ollama": "Ollama", "openai": T("Lokale KI", "Local AI")}.get(settings.llm_provider, ""),
             "notify": notify.enabled(settings),
             "draftDay": planner.wd_long(settings.draft_weekday), "listDay": planner.wd_long(settings.list_weekday),
             "shopDay": planner.wd_long(settings.shop_weekday),
@@ -214,7 +217,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     # ---------- Rezepte ----------
     def llm_or_400():
         if not settings.llm_enabled:
-            raise HTTPException(400, T("Dafür ist eine KI nötig (LLM_PROVIDER=claude oder ollama).", "This needs an AI (LLM_PROVIDER=claude or ollama)."))
+            raise HTTPException(400, T("Dafür ist eine KI nötig (LLM_PROVIDER=claude, ollama oder openai).", "This needs an AI (LLM_PROVIDER=claude, ollama or openai)."))
 
     async def llm_call(coro):
         try:
@@ -258,6 +261,40 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         recipe = await llm_call(planner.recipe_generate(store, settings, wish))
         recipe["source"] = T(f"KI ({settings.llm_provider})", f"AI ({settings.llm_provider})")
         return recipe
+
+    # ---------- Rezepte von Fotos ----------
+    @app.post("/api/imports")
+    async def create_imports(body: dict[str, Any] = Body(...)):
+        llm_or_400()
+        images = body.get("images") or []
+        if not isinstance(images, list):
+            raise HTTPException(400, T("Ungültige Anfrage.", "Invalid request."))
+        try:
+            ids = photos.create_imports(store, settings, images, bool(body.get("together")))
+        except photos.PhotoError as e:
+            raise HTTPException(400, str(e))
+        photo_worker.wake.set()
+        return {"ids": ids}
+
+    @app.post("/api/imports/{doc_id}/retry")
+    async def retry_import(doc_id: str):
+        if not store.get("imports", doc_id):
+            raise HTTPException(404, T("Nicht gefunden", "Not found"))
+        store.update("imports", doc_id, {"state": "waiting", "message": {"__delete__": True}})
+        photo_worker.wake.set()
+        return {"ok": True}
+
+    @app.delete("/api/imports/{doc_id}")
+    async def remove_import(doc_id: str):
+        photos.delete_import(store, settings, doc_id)
+        return {"ok": True}
+
+    @app.get("/api/imports/{doc_id}/image/{n}")
+    async def import_image(doc_id: str, n: int):
+        path = photos.image_path(store, settings, doc_id, n)
+        if not path:
+            raise HTTPException(404, T("Nicht gefunden", "Not found"))
+        return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
 
     # ---------- Home Assistant: Sensor-Daten ----------
     @app.get("/api/ha/today")

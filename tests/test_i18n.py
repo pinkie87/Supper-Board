@@ -82,7 +82,7 @@ def test_api_language_header_and_setting(settings):
     with TestClient(create_app(settings, run_scheduler=False)) as c:
         assert c.get("/api/config").json()["language"] == "de"
         r = c.post("/api/recipes/generate", json={"wish": "x"}, headers={"X-Lang": "en"})
-        assert r.json()["detail"] == "This needs an AI (LLM_PROVIDER=claude or ollama)."
+        assert r.json()["detail"] == "This needs an AI (LLM_PROVIDER=claude, ollama or openai)."
         c.put("/api/db/plan/settings", json={"language": "en"})
         assert c.get("/api/config").json()["language"] == "en"
         assert c.get("/api/db/nope").json()["detail"] == "Unknown collection"

@@ -2,12 +2,13 @@
 
 # KI einrichten
 
-Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt eingefügte Rezepttexte um und erfindet Rezepte auf Wunsch. Umschalten in der `.env` mit `LLM_PROVIDER` und danach den Dienst neu starten. Rezepte und Pläne schreibt die KI in der Sprache des Boards (Deutsch oder Englisch), immer metrisch.
+Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt eingefügte Rezepttexte um, liest Rezepte von Fotos und erfindet Rezepte auf Wunsch. Umschalten in der `.env` mit `LLM_PROVIDER` und danach den Dienst neu starten. Rezepte und Pläne schreibt die KI in der Sprache des Boards (Deutsch oder Englisch), immer metrisch.
 
 | `LLM_PROVIDER` | Was passiert | Datenschutz |
 |---|---|---|
 | `claude` | Claude über die Anthropic-API. Beste Rezeptqualität. | Beim Planen gehen Richtlinien, Bewertungen, Notizen, Wünsche, Vorrat, Gefrierschrank und die Titel eurer Rezepte an Anthropic. Alles andere bleibt auf dem Server. |
-| `ollama` | Lokales Modell über [Ollama](https://ollama.com). | Nichts verlässt das Heimnetz. |
+| `ollama` | Lokales Modell über [Ollama](https://ollama.com), auf dem Server oder deinem PC. | Nichts verlässt das Heimnetz. |
+| `openai` | Lokaler OpenAI-kompatibler Server, z. B. llama.cpp oder LM Studio (auch mit Unsloth-Modellen). | Nichts verlässt das Heimnetz. |
 | `none` | Keine KI. Pläne werden aus der Rezeptdatenbank zusammengestellt (gut bewertete zuerst, mit Abwechslung). | Nichts verlässt den Server. |
 
 Ohne KI funktioniert alles andere weiter: Rezepte per Formular oder Link anlegen, Plan aus der Datenbank, Einkaufsliste, Erinnerungen.
@@ -30,31 +31,79 @@ Ohne KI funktioniert alles andere weiter: Rezepte per Formular oder Link anlegen
 
 Kosten: Ein Zwei-Wochen-Plan mit allen Rezepten kostet mit Opus grob 10–50 Cent, ein einzelnes Rezept etwa 1–5 Cent. Die genauen Preise stehen auf der Anthropic-Website.
 
-## Ollama
+## Ollama (auf dem Server oder auf deinem PC)
 
-1. Ollama auf dem Server (oder einem Rechner im Netz mit Grafikkarte) installieren:
+Ollama kann auf dem Server selbst laufen oder auf einem anderen Rechner im Heimnetz, z. B. deinem PC mit Grafikkarte. Das Board ruft es über das Netzwerk auf.
+
+1. Ollama installieren (Linux; für Windows und macOS gibt es Installer auf [ollama.com](https://ollama.com)) und Modelle laden:
 
    ```bash
    curl -fsSL https://ollama.com/install.sh | sh
-   ollama pull qwen3:14b
+   ollama pull qwen3:14b       # Textmodell für Pläne und Rezepte
+   ollama pull qwen2.5vl:7b    # Bildmodell für Fotos von Rezeptseiten
    ```
 
-2. Damit der Container Ollama erreicht, muss Ollama auf allen Schnittstellen lauschen:
+2. Ollama muss auf allen Netzwerkschnittstellen lauschen, nicht nur auf `localhost`:
+   - **Linux:** `sudo systemctl edit ollama`, dort `[Service]` und `Environment="OLLAMA_HOST=0.0.0.0"` eintragen, dann `sudo systemctl restart ollama`.
+   - **Windows:** Umgebungsvariable `OLLAMA_HOST` mit dem Wert `0.0.0.0` anlegen und Ollama neu starten. In der Windows-Firewall eingehende Verbindungen auf Port 11434 aus dem Heimnetz erlauben.
 
-   ```bash
-   sudo systemctl edit ollama
-   # einfügen:
-   # [Service]
-   # Environment="OLLAMA_HOST=0.0.0.0"
-   sudo systemctl restart ollama
-   ```
-
-3. In der `.env`:
+3. In der `.env` auf dem Server:
 
    ```ini
    LLM_PROVIDER=ollama
+   # Ollama auf dem Server selbst:
    OLLAMA_URL=http://host.containers.internal:11434
+   # Ollama auf deinem PC (IP-Adresse des PCs):
+   # OLLAMA_URL=http://192.168.178.20:11434
    OLLAMA_MODEL=qwen3:14b
+   OLLAMA_VISION_MODEL=qwen2.5vl:7b
    ```
 
-**Welches Modell?** Ein Zwei-Wochen-Plan ist eine lange, strukturierte Antwort. Modelle ab etwa 14 Milliarden Parametern (z. B. `qwen3:14b`, `gemma3:27b`, `mistral-small`) liefern brauchbare deutsche Rezepte; kleinere Modelle erfinden öfter unpassende Mengen. Ohne Grafikkarte kann ein Plan mehrere Minuten dauern – das Board zeigt währenddessen „… schreibt gerade den Speiseplan“.
+   Ob der Server den PC erreicht, zeigt `curl http://192.168.178.20:11434/api/tags` auf dem Server. Gib dem PC im Router am besten eine feste IP-Adresse.
+
+**Welches Modell?** Ein Zwei-Wochen-Plan ist eine lange, strukturierte Antwort. Modelle ab etwa 14 Milliarden Parametern (z. B. `qwen3:14b`, `gemma3:12b`, `mistral-small`) liefern brauchbare Rezepte; kleinere Modelle erfinden öfter unpassende Mengen. Ohne Grafikkarte kann ein Plan mehrere Minuten dauern – das Board zeigt währenddessen „… schreibt gerade den Speiseplan“.
+
+## Rezepte von Fotos einlesen
+
+Unter „Rezepte → Von Foto importieren“ lassen sich Fotos von Kochbuchseiten oder handgeschriebenen Rezepten hochladen. Dafür braucht es ein **Bildmodell**:
+
+- **Ollama:** `OLLAMA_VISION_MODEL`, z. B. `qwen2.5vl:7b` (liest Text auf Fotos gut, braucht ca. 6–8 GB Grafikspeicher), `gemma3:12b` oder – falls in deiner Ollama-Version vorhanden – `qwen3-vl:8b`. Ohne Eintrag wird `OLLAMA_MODEL` verwendet; das funktioniert nur, wenn dieses Modell selbst Bilder versteht (z. B. `gemma3`).
+- **OpenAI-kompatibler Server:** `OPENAI_VISION_MODEL` (siehe unten).
+- **Claude:** liest Fotos ohne weitere Einstellung.
+
+So läuft der Import:
+
+1. „Jedes Foto einzeln einlesen“ für ein Buch Seite für Seite; „Alle Fotos gehören zu einem Rezept“, wenn ein Rezept über mehrere Seiten geht.
+2. Das Board verkleinert die Fotos vor dem Hochladen (längste Seite 2000 Pixel). Der Server liest sie im Hintergrund nacheinander in der hochgeladenen Reihenfolge – die Seite darf dabei geschlossen werden.
+3. Unter „Foto-Import“ erscheint jedes gefundene Rezept mit „Prüfen“. Das Formular zeigt das Foto zum Vergleich; erst „Speichern“ legt das Rezept in der Datenbank an. Danach wird das Foto gelöscht.
+4. Ist der PC mit der KI aus, steht das Foto auf „Fehler“. Später „Erneut versuchen“ bzw. „Alle mit Fehler erneut versuchen“ antippen.
+
+Die Fotos liegen bis zum Speichern oder Verwerfen in `uploads/` im Datenverzeichnis des Servers. Tipps: eine Seite pro Foto, gerade von oben, gutes Licht, kein Blitz. Unleserliche Stellen markiert die KI mit `[?]`.
+
+## OpenAI-kompatibler Server (llama.cpp, LM Studio, vLLM, Unsloth-Modelle)
+
+Viele lokale Programme bieten dieselbe Schnittstelle wie OpenAI an: `llama-server` aus [llama.cpp](https://github.com/ggml-org/llama.cpp), LM Studio oder vLLM. Damit lassen sich z. B. die quantisierten GGUF-Modelle von [Unsloth](https://huggingface.co/unsloth) nutzen. (Viele Unsloth-GGUF-Modelle laufen auch direkt in Ollama: `ollama run hf.co/unsloth/<Modell>-GGUF`.)
+
+Beispiel mit `llama-server` auf dem PC, ein Bildmodell mit Projektor-Datei (`mmproj`):
+
+```bash
+llama-server -m Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf --mmproj mmproj-F16.gguf --host 0.0.0.0 --port 8080
+```
+
+In der `.env`:
+
+```ini
+LLM_PROVIDER=openai
+OPENAI_URL=http://192.168.178.20:8080/v1
+OPENAI_MODEL=local
+# Nur nötig, wenn für Fotos ein anderes Modell geladen ist (z. B. in LM Studio):
+OPENAI_VISION_MODEL=
+# Nur nötig, wenn der Server einen Schlüssel verlangt:
+OPENAI_API_KEY=
+```
+
+Das Board fordert die Antwort als JSON nach Schema an; kennt ein Server das nicht, fragt es ohne Schema noch einmal nach.
+
+## Wenn der PC nicht läuft
+
+Läuft die KI auf deinem PC, muss er zu den eingestellten Zeiten an sein (Planentwurf `SB_DRAFT_DAY`/`SB_DRAFT_TIME`, Einkaufsliste `SB_LIST_DAY`/`SB_LIST_TIME`). Ist er aus, zeigt das Board „Das hat nicht geklappt“ und – falls eingerichtet – Home Assistant schickt eine Nachricht. Dann einfach später „Nächsten Plan jetzt erstellen“ bzw. „Einkaufsliste jetzt erstellen“ antippen. Fotos warten mit „Fehler“, bis du sie erneut versuchst.

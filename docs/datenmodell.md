@@ -65,6 +65,7 @@ Die Bewertung eines Rezepts ergibt sich aus allen Gerichten mit passender `recip
 | `grocery` | `{text, at}` – Zusätze für den nächsten Einkauf |
 | `staples` | `{name, group, status, order}` – Grundvorrat, `status`: `have`, `low` oder `unknown` |
 | `freezer` | `{name, forMeal, at}` – Gefrierschrankinhalt |
+| `imports` | `{state, images, recipes, message, order, createdAt}` – Foto-Import: `state` ist `waiting`, `working`, `done` oder `error`; `recipes` sind die erkannten, noch nicht geprüften Rezepte. Die Fotos liegen in `uploads/`. |
 
 ### `plan` (vier Dokumente)
 

@@ -38,13 +38,20 @@ class Settings:
     language: str = field(default_factory=lambda: _env("SB_LANGUAGE", "de").lower()[:2])
     public_url: str = field(default_factory=lambda: _env("SB_PUBLIC_URL"))
 
-    # KI: "claude", "ollama" oder "none"
+    # KI: "claude", "ollama", "openai" (OpenAI-kompatibler Server) oder "none"
     llm_provider: str = field(default_factory=lambda: _env("LLM_PROVIDER", "none").lower())
     anthropic_api_key: str = field(default_factory=lambda: _env("ANTHROPIC_API_KEY"))
     claude_model: str = field(default_factory=lambda: _env("CLAUDE_MODEL", "claude-opus-5-5"))
     claude_effort: str = field(default_factory=lambda: _env("CLAUDE_EFFORT", "medium"))
     ollama_url: str = field(default_factory=lambda: _env("OLLAMA_URL", "http://localhost:11434").rstrip("/"))
     ollama_model: str = field(default_factory=lambda: _env("OLLAMA_MODEL", "qwen3:14b"))
+    # Modell für Fotos von Rezeptseiten; leer = OLLAMA_MODEL
+    ollama_vision_model: str = field(default_factory=lambda: _env("OLLAMA_VISION_MODEL"))
+    # OpenAI-kompatibler Server (llama.cpp, LM Studio, vLLM), Adresse inklusive /v1
+    openai_url: str = field(default_factory=lambda: _env("OPENAI_URL", "http://localhost:8080/v1").rstrip("/"))
+    openai_model: str = field(default_factory=lambda: _env("OPENAI_MODEL", "local"))
+    openai_vision_model: str = field(default_factory=lambda: _env("OPENAI_VISION_MODEL"))
+    openai_api_key: str = field(default_factory=lambda: _env("OPENAI_API_KEY"))
 
     # Einkauf
     store_name: str = field(default_factory=lambda: _env("SB_STORE_NAME", "REWE"))
@@ -72,7 +79,7 @@ class Settings:
 
     @property
     def llm_enabled(self) -> bool:
-        return self.llm_provider in ("claude", "ollama")
+        return self.llm_provider in ("claude", "ollama", "openai")
 
 
 settings = Settings()
