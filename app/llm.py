@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 
 from .config import Settings
+from .i18n import T
 
 log = logging.getLogger(__name__)
 
@@ -29,14 +30,14 @@ async def generate_json(settings: Settings, system: str, prompt: str, schema: di
         return await _claude(settings, system, prompt, schema)
     if provider == "ollama":
         return await _ollama(settings, system, prompt, schema)
-    raise LLMUnavailable("Keine KI eingerichtet (LLM_PROVIDER ist 'none').")
+    raise LLMUnavailable(T("Keine KI eingerichtet (LLM_PROVIDER ist 'none').", "No AI configured (LLM_PROVIDER is 'none')."))
 
 
 async def _claude(settings: Settings, system: str, prompt: str, schema: dict[str, Any]) -> dict:
     import anthropic
 
     if not settings.anthropic_api_key:
-        raise LLMUnavailable("ANTHROPIC_API_KEY fehlt.")
+        raise LLMUnavailable(T("ANTHROPIC_API_KEY fehlt.", "ANTHROPIC_API_KEY is missing."))
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     try:
         async with client.beta.messages.stream(
@@ -55,23 +56,23 @@ async def _claude(settings: Settings, system: str, prompt: str, schema: dict[str
         ) as stream:
             message = await stream.get_final_message()
     except anthropic.AuthenticationError as e:
-        raise LLMError("Claude: API-Schlüssel ungültig.") from e
+        raise LLMError(T("Claude: API-Schlüssel ungültig.", "Claude: invalid API key.")) from e
     except anthropic.RateLimitError as e:
-        raise LLMError("Claude: Ratenlimit erreicht, bitte später erneut versuchen.") from e
+        raise LLMError(T("Claude: Ratenlimit erreicht, bitte später erneut versuchen.", "Claude: rate limit reached, please try again later.")) from e
     except anthropic.APIStatusError as e:
-        raise LLMError(f"Claude: Fehler {e.status_code}: {e.message}") from e
+        raise LLMError(T(f"Claude: Fehler {e.status_code}: {e.message}", f"Claude: error {e.status_code}: {e.message}")) from e
     except anthropic.APIConnectionError as e:
-        raise LLMError("Claude: keine Verbindung zur Anthropic-API.") from e
+        raise LLMError(T("Claude: keine Verbindung zur Anthropic-API.", "Claude: cannot reach the Anthropic API.")) from e
 
     if message.stop_reason == "refusal":
-        raise LLMError("Claude hat die Anfrage abgelehnt.")
+        raise LLMError(T("Claude hat die Anfrage abgelehnt.", "Claude declined the request."))
     if message.stop_reason == "max_tokens":
-        raise LLMError("Claude: Antwort wurde abgeschnitten (zu lang).")
+        raise LLMError(T("Claude: Antwort wurde abgeschnitten (zu lang).", "Claude: the answer was cut off (too long)."))
     text = next((b.text for b in message.content if b.type == "text"), "")
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
-        raise LLMError("Claude: Antwort war kein gültiges JSON.") from e
+        raise LLMError(T("Claude: Antwort war kein gültiges JSON.", "Claude: the answer was not valid JSON.")) from e
 
 
 async def _ollama(settings: Settings, system: str, prompt: str, schema: dict[str, Any]) -> dict:
@@ -89,11 +90,11 @@ async def _ollama(settings: Settings, system: str, prompt: str, schema: dict[str
         async with httpx.AsyncClient(timeout=httpx.Timeout(900.0, connect=10.0)) as client:
             r = await client.post(f"{settings.ollama_url}/api/chat", json=body)
     except httpx.HTTPError as e:
-        raise LLMError(f"Ollama nicht erreichbar unter {settings.ollama_url}.") from e
+        raise LLMError(T(f"Ollama nicht erreichbar unter {settings.ollama_url}.", f"Cannot reach Ollama at {settings.ollama_url}.")) from e
     if r.status_code != 200:
-        raise LLMError(f"Ollama: Fehler {r.status_code}: {r.text[:200]}")
+        raise LLMError(T(f"Ollama: Fehler {r.status_code}: {r.text[:200]}", f"Ollama: error {r.status_code}: {r.text[:200]}"))
     content = r.json().get("message", {}).get("content", "")
     try:
         return json.loads(content)
     except json.JSONDecodeError as e:
-        raise LLMError("Ollama: Antwort war kein gültiges JSON.") from e
+        raise LLMError(T("Ollama: Antwort war kein gültiges JSON.", "Ollama: the answer was not valid JSON.")) from e

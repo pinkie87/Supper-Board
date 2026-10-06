@@ -6,13 +6,13 @@ Supper Board sends notifications through Home Assistant's `notify` services, for
 
 ## Notifications
 
-The messages themselves are in German. **What gets sent:**
+Messages follow the board's language (German or English). **What gets sent:**
 
-| When | Message (example, translated) |
+| When | Message (example) |
 |---|---|
-| New plan drafted | "New meal plan 12.10.–25.10.: … Please review and approve it on Supper Board by Thursday." |
-| Shopping list ready | "The shopping list for Sat 17.10. is ready (32 items)." |
-| The evening before (`SB_THAW_TIME`, default 20:00) | "Before bed: move the chicken breast (approx. 600 g) from the freezer to the fridge – for tomorrow: chicken curry." |
+| New plan drafted | "New meal plan 12 Oct–25 Oct: … Please review and approve it on Supper Board by Thursday." |
+| Shopping list ready | "The shopping list for Sat 17 Oct is ready (32 items)." |
+| The evening before (`SB_THAW_TIME`, default 20:00) | "Before bed: move the chicken breast (approx. 600 g) from the freezer to the fridge – for tomorrow: Chicken curry." |
 | Optional, daily (`SB_DINNER_TIME`) | "Cooking tonight: roasted vegetables with feta (45 min)." |
 | Errors | e.g. when the AI could not be reached |
 
@@ -31,7 +31,7 @@ With `SB_PUBLIC_URL` set, tapping the notification opens the board.
    ```
 
    If Home Assistant runs on the same machine as the container, use the server's IP address or `host.containers.internal` instead of `localhost`.
-4. Restart the service (`systemctl --user restart supper-board`) and test it in the board under **Feedback → Einrichtung → Home Assistant → Test senden**.
+4. Restart the service (`systemctl --user restart supper-board`) and test it in the board under **Feedback → Setup → Home Assistant → Send test**.
 
 ## "Dinner tonight" sensor
 

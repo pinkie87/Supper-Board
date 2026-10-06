@@ -66,7 +66,7 @@ Die Bewertung eines Rezepts ergibt sich aus allen Gerichten mit passender `recip
 | `staples` | `{name, group, status, order}` – Grundvorrat, `status`: `have`, `low` oder `unknown` |
 | `freezer` | `{name, forMeal, at}` – Gefrierschrankinhalt |
 
-### `plan` (drei Dokumente)
+### `plan` (vier Dokumente)
 
 **`plan/current`**
 
@@ -89,6 +89,8 @@ Die Bewertung eines Rezepts ergibt sich aus allen Gerichten mit passender `recip
 | `included` | `{grocery: [ids], staples: [ids]}` – wird bei „Eingekauft“ abgehakt |
 
 **`plan/job`** – Stand der gerade laufenden Aufgabe: `{name, state: "running"|"done"|"error", message}`.
+
+**`plan/settings`** – Einstellungen des Haushalts: `{language: "de"|"en"}`. Fehlt, bis jemand die Sprache umschaltet; bis dahin gilt `SB_LANGUAGE`.
 
 ## Ablauf der Status
 

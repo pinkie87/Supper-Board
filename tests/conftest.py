@@ -19,3 +19,13 @@ def store(settings):
     s = Store(settings.db_path)
     yield s
     s.close()
+
+
+@pytest.fixture(autouse=True)
+def reset_language():
+    from app import i18n
+    i18n.set_default("de")
+    i18n.set_lang(None)
+    yield
+    i18n.set_default("de")
+    i18n.set_lang(None)

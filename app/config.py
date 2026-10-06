@@ -34,6 +34,8 @@ class Settings:
     password: str = field(default_factory=lambda: _env("SB_PASSWORD"))
     timezone: ZoneInfo = field(default_factory=lambda: ZoneInfo(_env("SB_TIMEZONE", "Europe/Berlin")))
     household: str = field(default_factory=lambda: _env("SB_HOUSEHOLD", "ein Haushalt mit zwei Personen"))
+    # Standardsprache, bis im Board eine gewählt wird: "de" oder "en"
+    language: str = field(default_factory=lambda: _env("SB_LANGUAGE", "de").lower()[:2])
     public_url: str = field(default_factory=lambda: _env("SB_PUBLIC_URL"))
 
     # KI: "claude", "ollama" oder "none"

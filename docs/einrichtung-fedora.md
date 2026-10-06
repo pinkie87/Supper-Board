@@ -30,6 +30,7 @@ Mindestens anpassen:
 | `LLM_PROVIDER` | `claude`, `ollama` oder `none`, siehe [ki.md](ki.md) |
 | `HA_URL`, `HA_TOKEN`, `HA_NOTIFY` | Home Assistant, siehe [home-assistant.md](home-assistant.md) |
 | `SB_SHOP_DAY` | An welchem Wochentag eingekauft wird (Standard: `sa`) |
+| `SB_LANGUAGE` | `de` oder `en`: Startsprache des Boards; später im Board umschaltbar |
 
 ## 3. Bauen
 

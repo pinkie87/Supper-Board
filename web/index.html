@@ -363,7 +363,7 @@ h2{font-size:1.15rem;font-weight:700}
     <div class="section">
       <div class="section-head"><h2>Einrichtung</h2></div>
       <ul class="list setup" id="setupDyn"></ul>
-      <p class="muted" style="margin:0;font-size:.88rem">Geändert wird das in der Datei <code>.env</code> auf dem Server.</p>
+      <p class="muted" style="margin:0;font-size:.88rem" id="setupHint"></p>
     </div>
   </section>
 
@@ -452,8 +452,14 @@ h2{font-size:1.15rem;font-weight:700}
 
 <script>
 (function(){
-  const S = {meals:[],draft:[],history:[],notes:[],grocery:[],staples:[],freezer:[],ideas:[],recipes:[],plan:null,dplan:null,job:null,loaded:{}};
+  const S = {meals:[],draft:[],history:[],notes:[],grocery:[],staples:[],freezer:[],ideas:[],recipes:[],plan:null,dplan:null,job:null,settings:null,loaded:{}};
   let CFG = {};
+  // Sprache: "de" oder "en", gilt für den ganzen Haushalt (plan/settings)
+  let LANG = "de";
+  const L = (de, en) => LANG==="en" ? en : de;
+  const LOC = () => LANG==="en" ? "en-GB" : "de-DE";
+  // Wochentag 0 = Montag; 5.1.2026 war ein Montag
+  const dayName = (wd, fallback) => wd==null ? fallback : new Date(2026,0,5+wd).toLocaleDateString(LOC(),{weekday:"long"});
   const checked = new Set(); let wakeLock = null;
   let db = null, dbState = "pending", readOnly = false, tab = "today", openId = null;
   const $ = id => document.getElementById(id);
@@ -461,13 +467,13 @@ h2{font-size:1.15rem;font-weight:700}
   const keyOf = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
   const dateOf = k => { const [y,m,d] = k.split("-").map(Number); return new Date(y,m-1,d); };
   const addDays = (k,n) => { const d = dateOf(k); d.setDate(d.getDate()+n); return keyOf(d); };
-  const fmt = (k,o) => dateOf(k).toLocaleDateString("de-DE",o);
+  const fmt = (k,o) => dateOf(k).toLocaleDateString(LOC(),o);
   const today = () => keyOf(new Date());
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3.2 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.2l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>';
   const SNOW = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 2 3-2M9 20l3-2 3 2"/></svg>';
   const X = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-  const KIND = {cook:"Kochen",leftovers:"Reste",flex:"Flexibel"};
+  const KIND = () => L({cook:"Kochen",leftovers:"Reste",flex:"Flexibel"},{cook:"Cook night",leftovers:"Leftovers",flex:"Flexible"});
 
   const byDate = (a,b)=>a.date<b.date?-1:a.date>b.date?1:0;
   const meals = () => S.meals.concat(S.draft).sort(byDate);
@@ -482,7 +488,7 @@ h2{font-size:1.15rem;font-weight:700}
     const src = (m._col==="draft"?S.draft:S.meals).slice().sort(byDate); if(!src.length) return "";
     const st = src[0].date, w = weekOf(m.date,st);
     const list = src.filter(x=>x.kind==="cook" && weekOf(x.date,st)===w);
-    return (list.findIndex(x=>x.id===m.id)+1)+" von "+list.length;
+    return (list.findIndex(x=>x.id===m.id)+1)+L(" von "," of ")+list.length;
   }
   // Wochentag 0 = Montag (wie auf dem Server)
   const wdOf = k => (dateOf(k).getDay()+6)%7;
@@ -495,21 +501,21 @@ h2{font-size:1.15rem;font-weight:700}
   }
   const short = k => fmt(k,{weekday:"short",day:"numeric",month:"numeric"});
   const cap = s => { s = String(s||""); return s.charAt(0).toUpperCase()+s.slice(1); };
-  const storeName = () => CFG.storeName || "Supermarkt";
+  const storeName = () => CFG.storeName || L("Supermarkt","supermarket");
   const aiName = () => CFG.llmLabel || "";
   function itemLink(i){
     if(!CFG.storeSearchUrl) return esc(i);
-    const q = String(i).replace(/\(.*?\)/g,"").replace(/^[\d.,/½¼¾\s]+(g|kg|ml|l|EL|TL|Stück|Stk\.?|Pck\.?|Packung(en)?|Bund|Dose[n]?|Becher|Glas|Flasche[n]?)?\s+/i,"").split(",")[0].trim();
+    const q = String(i).replace(/\(.*?\)/g,"").replace(/^[\d.,/½¼¾\s]+(g|kg|ml|l|EL|TL|Stück|Stk\.?|Pck\.?|Packung(en)?|Bund|Dose[n]?|Becher|Glas|Flasche[n]?|tbsp|tsp|tins?|cans?|packs?|bunch(es)?|jars?|bottles?|pcs?)?\s+/i,"").split(",")[0].trim();
     return '<a class="shoplink" href="'+esc(CFG.storeSearchUrl.replace("{q}", encodeURIComponent(q||i)))+'" target="_blank" rel="noopener">'+esc(i)+'</a>';
   }
   const jobRunning = () => S.job && S.job.state==="running";
-  const draftNowBtn = (label) => '<button type="button" class="btn small'+(label?'':' ghost')+'" data-act="draftNow"'+(jobRunning()?' disabled':'')+'>'+(label||"Nächsten Plan jetzt erstellen")+'</button>';
-  const listNowBtn = () => '<button type="button" class="btn small ghost" data-act="listNow"'+(jobRunning()?' disabled':'')+'>Einkaufsliste jetzt erstellen</button>';
+  const draftNowBtn = (label) => '<button type="button" class="btn small'+(label?'':' ghost')+'" data-act="draftNow"'+(jobRunning()?' disabled':'')+'>'+(label||L("Nächsten Plan jetzt erstellen","Create next plan now"))+'</button>';
+  const listNowBtn = () => '<button type="button" class="btn small ghost" data-act="listNow"'+(jobRunning()?' disabled':'')+'>'+L('Einkaufsliste jetzt erstellen','Create shopping list now')+'</button>';
   function jobHtml(){
     const j = S.job; if(!j) return "";
-    const what = j.name==="list" ? "die Einkaufsliste" : "den Speiseplan";
-    if(j.state==="running") return '<div class="status"><b>'+(aiName()?aiName()+' schreibt gerade '+what:'Erstelle gerade '+what)+' …</b><span>Das dauert meist ein bis zwei Minuten. Das Board aktualisiert sich von selbst.</span></div>';
-    if(j.state==="error") return '<div class="status attn"><b>Das hat nicht geklappt</b><span>'+esc(j.message||"")+'</span><div class="row"><button type="button" class="btn small ghost" data-act="dismissJob">Ausblenden</button></div></div>';
+    const what = j.name==="list" ? L("die Einkaufsliste","the shopping list") : L("den Speiseplan","the meal plan");
+    if(j.state==="running") return '<div class="status"><b>'+(aiName()?aiName()+L(' schreibt gerade ',' is writing ')+what:L('Erstelle gerade ','Creating ')+what)+' …</b><span>'+L('Das dauert meist ein bis zwei Minuten. Das Board aktualisiert sich von selbst.','This usually takes a minute or two. The board updates by itself.')+'</span></div>';
+    if(j.state==="error") return '<div class="status attn"><b>'+L('Das hat nicht geklappt','That didn’t work')+'</b><span>'+esc(j.message||"")+'</span><div class="row"><button type="button" class="btn small ghost" data-act="dismissJob">'+L('Ausblenden','Dismiss')+'</button></div></div>';
     return "";
   }
   function statusHtml(where){
@@ -520,35 +526,35 @@ h2{font-size:1.15rem;font-weight:700}
     const job = jobHtml();
     if(st==="drafted"){
       const n = S.draft.filter(m=>m.swapOut).length;
-      return job+'<div class="status attn"><b>Der nächste Plan ist fertig</b><span>'+(range?range+": ":"")+'Markiert, was ersetzt werden soll, und gebt ihn bis '+esc(CFG.listDay||"Donnerstag")+' frei.'+(n?' '+n+' Gericht'+(n>1?'e':'')+' zum Ersetzen markiert.':'')+'</span>'+note+
-        '<div class="row">'+(where!=="plan"?'<button type="button" class="btn small ghost" data-tab="plan">Plan ansehen</button>':'')+'<button type="button" class="btn small" data-act="approve">Plan freigeben</button>'+(where==="plan"?listNowBtn():'')+'</div></div>';
+      return job+'<div class="status attn"><b>'+L('Der nächste Plan ist fertig','The next plan is ready')+'</b><span>'+(range?range+": ":"")+L('Markiert, was ersetzt werden soll, und gebt ihn bis '+esc(dayName(CFG.listWd,"Donnerstag"))+' frei.','Mark anything you want replaced, then approve it by '+esc(dayName(CFG.listWd,"Thursday"))+'.')+(n?' '+L(n+' Gericht'+(n>1?'e':'')+' zum Ersetzen markiert.',n+' meal'+(n>1?'s':'')+' marked to replace.'):'')+'</span>'+note+
+        '<div class="row">'+(where!=="plan"?'<button type="button" class="btn small ghost" data-tab="plan">'+L('Plan ansehen','Review the plan')+'</button>':'')+'<button type="button" class="btn small" data-act="approve">'+L('Plan freigeben','Approve plan')+'</button>'+(where==="plan"?listNowBtn():'')+'</div></div>';
     }
-    if(st==="approved") return job+'<div class="status"><b>Plan freigegeben</b><span>Die Einkaufsliste wird am '+esc(CFG.listDay||"Donnerstag")+' erstellt'+(pickup?' – Einkauf '+esc(pickup):'')+'.</span>'+note+'<div class="row">'+listNowBtn()+'</div></div>';
-    if(st==="list_ready") return job+'<div class="status attn"><b>Die Einkaufsliste für '+esc(storeName())+' ist fertig</b><span>Kopieren und in die '+esc(storeName())+'-App oder den Online-Shop übernehmen'+(pickup?' (Einkauf '+esc(pickup)+')':'')+'. Danach auf „Eingekauft“ tippen.</span>'+note+
-      '<div class="row"><button type="button" class="btn small" data-act="copy">Liste kopieren</button>'+(CFG.storeUrl?'<a class="btn small ghost" href="'+esc(CFG.storeUrl)+'" target="_blank" rel="noopener">'+esc(storeName())+' öffnen</a>':'')+'<button type="button" class="btn small ghost" data-act="ordered">Eingekauft</button></div></div>';
-    if(st==="ordered") return job+'<div class="status"><b>Eingekauft</b><span>'+(pickup?'Einkauf '+esc(pickup)+'. ':'')+(d.prep?esc(d.prep):'')+'</span>'+note+'</div>';
-    return job+(note ? '<div class="status attn"><b>Hinweis</b>'+note+'</div>' : "");
+    if(st==="approved") return job+'<div class="status"><b>'+L('Plan freigegeben','Plan approved')+'</b><span>'+L('Die Einkaufsliste wird am '+esc(dayName(CFG.listWd,"Donnerstag"))+' erstellt'+(pickup?' – Einkauf '+esc(pickup):''),'The shopping list is created on '+esc(dayName(CFG.listWd,"Thursday"))+(pickup?' – shopping '+esc(pickup):''))+'.</span>'+note+'<div class="row">'+listNowBtn()+'</div></div>';
+    if(st==="list_ready") return job+'<div class="status attn"><b>'+L('Die Einkaufsliste für '+esc(storeName())+' ist fertig','Your '+esc(storeName())+' shopping list is ready')+'</b><span>'+L('Kopieren und in die '+esc(storeName())+'-App oder den Online-Shop übernehmen'+(pickup?' (Einkauf '+esc(pickup)+')':'')+'. Danach auf „Eingekauft“ tippen.','Copy it into the '+esc(storeName())+' app or online shop'+(pickup?' (shopping '+esc(pickup)+')':'')+', then tap “Bought”.')+'</span>'+note+
+      '<div class="row"><button type="button" class="btn small" data-act="copy">'+L('Liste kopieren','Copy list')+'</button>'+(CFG.storeUrl?'<a class="btn small ghost" href="'+esc(CFG.storeUrl)+'" target="_blank" rel="noopener">'+L(esc(storeName())+' öffnen','Open '+esc(storeName()))+'</a>':'')+'<button type="button" class="btn small ghost" data-act="ordered">'+L('Eingekauft','Bought')+'</button></div></div>';
+    if(st==="ordered") return job+'<div class="status"><b>'+L('Eingekauft','Bought')+'</b><span>'+(pickup?L('Einkauf ','Shopping ')+esc(pickup)+'. ':'')+(d.prep?esc(d.prep):'')+'</span>'+note+'</div>';
+    return job+(note ? '<div class="status attn"><b>'+L('Hinweis','Note')+'</b>'+note+'</div>' : "");
   }
   const notesFor = id => S.notes.filter(n=>n.meal===id).sort((a,b)=>(a.at||"")<(b.at||"")?-1:1);
   function starsHtml(m, mini){
-    const r = m.rating||0; let h = '<span class="stars'+(mini?' mini':'')+'"'+(mini?' aria-label="'+(r?r+' von 5 Sternen':'Nicht bewertet')+'"':' role="group" aria-label="Gericht bewerten"')+'>';
+    const r = m.rating||0; let h = '<span class="stars'+(mini?' mini':'')+'"'+(mini?' aria-label="'+(r?L(r+' von 5 Sternen',r+' of 5 stars'):L('Nicht bewertet','Not rated'))+'"':' role="group" aria-label="'+L('Gericht bewerten','Rate this meal')+'"')+'>';
     for(let i=1;i<=5;i++){
       h += mini ? '<span class="star'+(i<=r?' on':'')+'">'+STAR+'</span>'
-                : '<button type="button" class="star'+(i<=r?' on':'')+'" data-act="rate" data-id="'+esc(m.id)+'" data-v="'+i+'" aria-label="'+i+' Stern'+(i>1?'e':'')+'" aria-pressed="'+(i===r)+'">'+STAR+'</button>';
+                : '<button type="button" class="star'+(i<=r?' on':'')+'" data-act="rate" data-id="'+esc(m.id)+'" data-v="'+i+'" aria-label="'+L(i+' Stern'+(i>1?'e':''),i+' star'+(i>1?'s':''))+'" aria-pressed="'+(i===r)+'">'+STAR+'</button>';
     }
     return h+'</span>';
   }
-  function chip(kind){ return '<span class="chip '+esc(kind)+'">'+esc(KIND[kind]||kind)+'</span>'; }
+  function chip(kind){ return '<span class="chip '+esc(kind)+'">'+esc(KIND()[kind]||kind)+'</span>'; }
 
   function dayRow(m, t){
     const cls = ["day", m.kind]; if(m.date<t) cls.push("past"); if(m.date===t) cls.push("today");
     const next = mealOn(addDays(m.date,1));
     let sub = chip(m.kind);
     if(m.kind==="cook") sub += '<span class="muted" style="font-size:.8rem">'+cookNo(m)+'</span>';
-    if(m.swapOut) sub += '<span class="chip replace">Ersetzen</span>';
+    if(m.swapOut) sub += '<span class="chip replace">'+L('Ersetzen','Replace')+'</span>';
     if(m.rating) sub += starsHtml(m,true);
-    const nn = notesFor(m.id).length; if(nn) sub += '<span class="muted" style="font-size:.8rem">'+nn+' Notiz'+(nn>1?'en':'')+'</span>';
-    if(next && next.thaw) sub += '<span class="thawline'+(next.thawDone?' done':'')+'">'+SNOW.replace('class="ico"','width="14" height="14"')+'Heute auftauen: '+esc(next.thaw)+'</span>';
+    const nn = notesFor(m.id).length; if(nn) sub += '<span class="muted" style="font-size:.8rem">'+L(nn+' Notiz'+(nn>1?'en':''),nn+' note'+(nn>1?'s':''))+'</span>';
+    if(next && next.thaw) sub += '<span class="thawline'+(next.thawDone?' done':'')+'">'+SNOW.replace('class="ico"','width="14" height="14"')+L('Heute auftauen: ','Thaw tonight: ')+esc(next.thaw)+'</span>';
     return '<li class="'+cls.join(" ")+'"><button type="button" data-act="open" data-id="'+esc(m.id)+'">'+
       '<span class="date"><span class="dow">'+fmt(m.date,{weekday:"short"})+'</span><span class="dnum">'+dateOf(m.date).getDate()+'</span></span>'+
       '<span class="what"><span class="t">'+esc(m.title)+'</span><span class="sub">'+sub+'</span></span>'+
@@ -557,8 +563,8 @@ h2{font-size:1.15rem;font-weight:700}
 
   function pushHtml(m, compact){
     const after = meals().filter(x=>x.date>m.date).length;
-    const lead = compact ? "Heute wird nicht gekocht? Plan nach hinten schieben." : "Verschiebt dieses Gericht"+(after?" und die "+after+" danach":"")+". Auftau-Erinnerungen wandern mit.";
-    return '<span class="lead">'+lead+'</span>'+[1,2].map(n=>'<button type="button" class="btn small'+(n>1?' ghost':'')+'" data-act="push" data-id="'+esc(m.id)+'" data-n="'+n+'">'+(n===1?"1 Tag später":"2 Tage später")+'</button>').join("");
+    const lead = compact ? L("Heute wird nicht gekocht? Plan nach hinten schieben.","Not cooking tonight? Push the plan back.") : L("Verschiebt dieses Gericht"+(after?" und die "+after+" danach":"")+". Auftau-Erinnerungen wandern mit.","Moves this meal"+(after?" and the "+after+" after it":"")+" later. Thaw reminders move with them.");
+    return '<span class="lead">'+lead+'</span>'+[1,2].map(n=>'<button type="button" class="btn small'+(n>1?' ghost':'')+'" data-act="push" data-id="'+esc(m.id)+'" data-n="'+n+'">'+(n===1?L("1 Tag später","1 day later"):L("2 Tage später","2 days later"))+'</button>').join("");
   }
   async function pushBack(id, n){
     const m = findMeal(id); if(!m) return;
@@ -568,15 +574,15 @@ h2{font-size:1.15rem;font-weight:700}
     const ok = await save(()=>apply(1));
     if(!ok) return;
     closeSheet();
-    let msg = "Plan um "+n+" Tag"+(n>1?"e":"")+" verschoben. "+m.title+" ist jetzt am "+fmt(addDays(m.date,n),{weekday:"long"})+".";
-    if(thawing) msg += " "+cap(thawing.thaw)+" taut schon auf und hält sich 1–2 Tage im Kühlschrank.";
-    toast(msg, async ()=>{ if(await save(()=>apply(-1))) toast("Rückgängig gemacht."); });
+    let msg = L("Plan um "+n+" Tag"+(n>1?"e":"")+" verschoben. "+m.title+" ist jetzt am "+fmt(addDays(m.date,n),{weekday:"long"})+".","Plan pushed back "+n+" day"+(n>1?"s":"")+". "+m.title+" is now on "+fmt(addDays(m.date,n),{weekday:"long"})+".");
+    if(thawing) msg += " "+cap(thawing.thaw)+L(" taut schon auf und hält sich 1–2 Tage im Kühlschrank."," is already thawing; it keeps 1–2 days in the fridge.");
+    toast(msg, async ()=>{ if(await save(()=>apply(-1))) toast(L("Rückgängig gemacht.","Undone.")); });
   }
 
   function renderHeader(){
     const t = today();
     $("todayLabel").textContent = fmt(t,{weekday:"long",month:"short",day:"numeric"});
-    $("viewTitle").textContent = {today:"Heute Abend",plan:"Zwei-Wochen-Plan",shop:"Einkauf",feedback:"Feedback",recipes:"Rezepte"}[tab];
+    $("viewTitle").textContent = L({today:"Heute Abend",plan:"Zwei-Wochen-Plan",shop:"Einkauf",feedback:"Feedback",recipes:"Rezepte"},{today:"Tonight",plan:"Two-week plan",shop:"Shopping",feedback:"Feedback",recipes:"Recipes"})[tab];
     const ms = S.meals.slice().sort(byDate);
     if(ms.length){
       const a = ms[0].date, b = ms[ms.length-1].date;
@@ -589,37 +595,37 @@ h2{font-size:1.15rem;font-weight:700}
     if(dbState==="none"){ $("todayDyn").innerHTML = ""; $("nextUpWrap").hidden = true; return; }
     if(dbState==="pending"){ $("nextUpWrap").hidden = true; return; }
     const cyw = cycleDates();
-    $("cycleWide").textContent = cyw && status()==="active" && !S.draft.length ? "Nächster Plan: Entwurf "+short(cyw.draft)+" · Liste "+short(cyw.cart)+" · Einkauf "+short(cyw.pickup) : "";
+    $("cycleWide").textContent = cyw && status()==="active" && !S.draft.length ? L("Nächster Plan: Entwurf ","Next plan: draft ")+short(cyw.draft)+L(" · Liste "," · list ")+short(cyw.cart)+L(" · Einkauf "," · shopping ")+short(cyw.pickup) : "";
     if(!S.loaded.meals){ return; }
     let h = statusHtml("today");
     const tm = mealOn(t), tomorrow = mealOn(addDays(t,1));
     if(!ms.length){
-      h += '<div class="empty">Noch kein Speiseplan. Unter „Plan“ lässt sich der erste erstellen.</div>';
+      h += '<div class="empty">'+L('Noch kein Speiseplan. Unter „Plan“ lässt sich der erste erstellen.','No meal plan yet. Create the first one under “Plan”.')+'</div>';
     } else if(!tm && t>=ms[0].date && t<=ms[ms.length-1].date){
       const nx = ms.find(m=>m.date>t);
-      h += '<div class="tonight"><span class="eyebrow">Freier Abend</span><span class="meal-title">Heute nichts geplant</span><p>'+(nx?"Als Nächstes: "+esc(nx.title)+" am "+fmt(nx.date,{weekday:"long"})+".":"")+'</p></div>';
+      h += '<div class="tonight"><span class="eyebrow">'+L('Freier Abend','Night off')+'</span><span class="meal-title">'+L('Heute nichts geplant','Nothing planned tonight')+'</span><p>'+(nx?L("Als Nächstes: "+esc(nx.title)+" am "+fmt(nx.date,{weekday:"long"})+".","Next up: "+esc(nx.title)+" on "+fmt(nx.date,{weekday:"long"})+"."):"")+'</p></div>';
     } else if(!tm){
       const last = ms[ms.length-1].date;
-      h += '<div class="tonight"><span class="eyebrow">'+(t>last?"Plan beendet":"Plan beginnt "+fmt(ms[0].date,{weekday:"long",month:"short",day:"numeric"}))+'</span><span class="meal-title">'+(t>last?"Der nächste Plan kommt bald":"Noch nichts geplant")+'</span><p>'+(t>last?"Wünsche unter „Feedback“ eintragen und Benötigtes auf die Einkaufsliste setzen.":"")+'</p></div>';
+      h += '<div class="tonight"><span class="eyebrow">'+(t>last?L("Plan beendet","Plan finished"):L("Plan beginnt ","Plan starts ")+fmt(ms[0].date,{weekday:"long",month:"short",day:"numeric"}))+'</span><span class="meal-title">'+(t>last?L("Der nächste Plan kommt bald","Next plan coming soon"):L("Noch nichts geplant","Nothing planned yet"))+'</span><p>'+(t>last?L("Wünsche unter „Feedback“ eintragen und Benötigtes auf die Einkaufsliste setzen.","Leave requests under “Feedback” and add what you need to the shopping list."):"")+'</p></div>';
     } else {
       h += '<button type="button" class="tonight" data-act="open" data-id="'+esc(tm.id)+'">'+
-        '<span class="meta">'+chip(tm.kind)+(tm.kind==="cook"?'<span class="muted" style="font-size:.85rem">Kochabend '+cookNo(tm)+' diese Woche</span>':'')+'</span>'+
+        '<span class="meta">'+chip(tm.kind)+(tm.kind==="cook"?'<span class="muted" style="font-size:.85rem">'+L('Kochabend '+cookNo(tm)+' diese Woche','Cook night '+cookNo(tm)+' this week')+'</span>':'')+'</span>'+
         '<span class="meal-title">'+esc(tm.title)+'</span>'+(tm.details?'<p>'+esc(tm.details)+'</p>':'')+
-        '<span class="muted" style="font-size:.85rem">'+(tm.recipe?'Antippen für Rezept, Notizen und Bewertung':'Antippen für Notizen, Bewertung oder zum Verschieben')+'</span></button>';
+        '<span class="muted" style="font-size:.85rem">'+(tm.recipe?L('Antippen für Rezept, Notizen und Bewertung','Tap for the recipe, notes and rating'):L('Antippen für Notizen, Bewertung oder zum Verschieben','Tap for notes, rating, or to move it'))+'</span></button>';
     }
     if(tm && !proposed(tm)) h += '<div class="push">'+pushHtml(tm,true)+'</div>';
     if(tm && tm.thaw && !tm.thawDone){
-      h += '<div class="thaw late">'+SNOW+'<div class="body"><span><strong>Aufgetaut?</strong> Heute Abend braucht ihr '+esc(tm.thaw)+' aus dem Gefrierschrank. Ist es noch gefroren: verschlossen in kaltes Wasser legen und das Wasser alle 30 Minuten wechseln – das dauert etwa ein bis zwei Stunden.</span><div><button class="btn small ghost" type="button" data-act="thaw" data-id="'+esc(tm.id)+'">Ist aufgetaut</button></div></div></div>';
+      h += '<div class="thaw late">'+SNOW+'<div class="body"><span>'+L('<strong>Aufgetaut?</strong> Heute Abend braucht ihr '+esc(tm.thaw)+' aus dem Gefrierschrank. Ist es noch gefroren: verschlossen in kaltes Wasser legen und das Wasser alle 30 Minuten wechseln – das dauert etwa ein bis zwei Stunden.','<strong>Did it thaw?</strong> Tonight needs '+esc(tm.thaw)+' from the freezer. If it’s still frozen, put it sealed in cold water and change the water every 30 minutes – that takes about one to two hours.')+'</span><div><button class="btn small ghost" type="button" data-act="thaw" data-id="'+esc(tm.id)+'">'+L('Ist aufgetaut','It’s thawed')+'</button></div></div></div>';
     }
     if(tomorrow && tomorrow.thaw){
       h += tomorrow.thawDone
-        ? '<div class="thaw">'+SNOW+'<div class="body"><span><strong>Taut auf.</strong> '+esc(cap(tomorrow.thaw))+' liegt im Kühlschrank für morgen: '+esc(tomorrow.title)+'.</span></div></div>'
-        : '<div class="thaw">'+SNOW+'<div class="body"><span><strong>Vor dem Schlafengehen:</strong> '+esc(tomorrow.thaw)+' aus dem Gefrierschrank in den Kühlschrank legen – für morgen: '+esc(tomorrow.title)+'.</span><div><button class="btn small ice" type="button" data-act="thaw" data-id="'+esc(tomorrow.id)+'">Erledigt, liegt im Kühlschrank</button></div></div></div>';
+        ? '<div class="thaw">'+SNOW+'<div class="body"><span>'+L('<strong>Taut auf.</strong> '+esc(cap(tomorrow.thaw))+' liegt im Kühlschrank für morgen: '+esc(tomorrow.title)+'.','<strong>Thawing.</strong> '+esc(cap(tomorrow.thaw))+' is in the fridge for tomorrow: '+esc(tomorrow.title)+'.')+'</span></div></div>'
+        : '<div class="thaw">'+SNOW+'<div class="body"><span>'+L('<strong>Vor dem Schlafengehen:</strong> '+esc(tomorrow.thaw)+' aus dem Gefrierschrank in den Kühlschrank legen – für morgen: '+esc(tomorrow.title)+'.','<strong>Before bed:</strong> move '+esc(tomorrow.thaw)+' from the freezer to the fridge – for tomorrow: '+esc(tomorrow.title)+'.')+'</span><div><button class="btn small ice" type="button" data-act="thaw" data-id="'+esc(tomorrow.id)+'">'+L('Erledigt, liegt im Kühlschrank','Done, it’s in the fridge')+'</button></div></div></div>';
     }
     const unrated = ms.filter(m=>m.kind==="cook" && m.date<t && !m.rating).pop();
     if(unrated){
-      h += '<div class="rate"><b>Wie war '+esc(unrated.title)+' am '+fmt(unrated.date,{weekday:"long"})+'?</b>'+starsHtml(unrated,false)+
-        '<button type="button" class="btn small ghost" style="align-self:flex-start" data-act="open" data-id="'+esc(unrated.id)+'">Notiz hinzufügen</button></div>';
+      h += '<div class="rate"><b>'+L('Wie war '+esc(unrated.title)+' am '+fmt(unrated.date,{weekday:"long"})+'?','How was '+fmt(unrated.date,{weekday:"long"})+'’s '+esc(unrated.title)+'?')+'</b>'+starsHtml(unrated,false)+
+        '<button type="button" class="btn small ghost" style="align-self:flex-start" data-act="open" data-id="'+esc(unrated.id)+'">'+L('Notiz hinzufügen','Add a note')+'</button></div>';
     }
     $("todayDyn").innerHTML = h;
     const up = ms.filter(m=>m.date>t).slice(0,7);
@@ -633,12 +639,12 @@ h2{font-size:1.15rem;font-weight:700}
       const w = weekOf(k,st), on = list.filter(m=>m.date===k);
       weeks[w] = weeks[w] || {first:k,last:k,rows:[]}; weeks[w].last = k;
       if(on.length) on.forEach(m=>weeks[w].rows.push(dayRow(m,t)));
-      else weeks[w].rows.push('<li class="day gap'+(k<t?' past':'')+(k===t?' today':'')+'"><div class="gaprow"><span class="date"><span class="dow">'+fmt(k,{weekday:"short"})+'</span><span class="dnum">'+dateOf(k).getDate()+'</span></span><span class="t">Freier Abend</span></div></li>');
+      else weeks[w].rows.push('<li class="day gap'+(k<t?' past':'')+(k===t?' today':'')+'"><div class="gaprow"><span class="date"><span class="dow">'+fmt(k,{weekday:"short"})+'</span><span class="dnum">'+dateOf(k).getDate()+'</span></span><span class="t">'+L('Freier Abend','Night off')+'</span></div></li>');
     }
     let h = "";
     Object.keys(weeks).sort((a,b)=>a-b).forEach(w=>{
       const wk = weeks[w];
-      h += '<div class="section"'+(first&&!h?' style="margin-top:0"':'')+'><div class="section-head"><h2>'+(label?label+' · ':'')+'Woche '+(+w+1)+'</h2><span class="muted" style="font-size:.85rem">'+fmt(wk.first,{month:"short",day:"numeric"})+' – '+fmt(wk.last,{month:"short",day:"numeric"})+'</span></div><ul class="days">'+wk.rows.join("")+'</ul></div>';
+      h += '<div class="section"'+(first&&!h?' style="margin-top:0"':'')+'><div class="section-head"><h2>'+(label?label+' · ':'')+L('Woche ','Week ')+(+w+1)+'</h2><span class="muted" style="font-size:.85rem">'+fmt(wk.first,{month:"short",day:"numeric"})+' – '+fmt(wk.last,{month:"short",day:"numeric"})+'</span></div><ul class="days">'+wk.rows.join("")+'</ul></div>';
     });
     return h;
   }
@@ -646,21 +652,21 @@ h2{font-size:1.15rem;font-weight:700}
   function renderPlan(){
     const t = today(), cur = S.meals.slice().sort(byDate), nx = S.draft.slice().sort(byDate);
     if(dbState==="none"){ $("planDyn").innerHTML = ""; return; }
-    if(!S.loaded.meals){ $("planDyn").innerHTML = '<div class="empty">Lade den Plan …</div>'; return; }
+    if(!S.loaded.meals){ $("planDyn").innerHTML = '<div class="empty">'+L('Lade den Plan …','Loading the plan …')+'</div>'; return; }
     let h = statusHtml("plan");
-    const how = CFG.llm && CFG.llm!=="none" ? aiName()+" schreibt den Plan mit eigenen Rezepten und nutzt gut bewertete Rezepte aus eurer Datenbank." : "Ohne KI wird der Plan aus eurer Rezeptdatenbank zusammengestellt – legt dafür unter „Rezepte“ ein paar Gerichte an.";
-    if(!cur.length && !nx.length){ $("planDyn").innerHTML = h+'<div class="empty stack"><span>Noch kein Speiseplan. '+how+'</span><div>'+draftNowBtn("Ersten Plan erstellen")+'</div></div>'; return; }
-    if(cur.length) h += blockHtml(cur, nx.length?"Aktueller Plan":"", t, !h);
+    const how = CFG.llm && CFG.llm!=="none" ? aiName()+L(" schreibt den Plan mit eigenen Rezepten und nutzt gut bewertete Rezepte aus eurer Datenbank."," writes the plan with its own recipes and reuses well-rated recipes from your database.") : L("Ohne KI wird der Plan aus eurer Rezeptdatenbank zusammengestellt – legt dafür unter „Rezepte“ ein paar Gerichte an.","Without AI the plan is built from your recipe database – add a few dishes under “Recipes” first.");
+    if(!cur.length && !nx.length){ $("planDyn").innerHTML = h+'<div class="empty stack"><span>'+L('Noch kein Speiseplan. ','No meal plan yet. ')+how+'</span><div>'+draftNowBtn(L("Ersten Plan erstellen","Create first plan"))+'</div></div>'; return; }
+    if(cur.length) h += blockHtml(cur, nx.length?L("Aktueller Plan","Current plan"):"", t, !h);
     const cy = cycleDates();
     if(nx.length){
       const d = S.dplan || {};
-      h += '<div class="section"><div class="section-head"><h2>Nächster Plan</h2><span class="muted" style="font-size:.85rem">'+(status()==="drafted"?"Vorschlag":"Freigegeben")+'</span></div>'+
+      h += '<div class="section"><div class="section-head"><h2>'+L('Nächster Plan','Next plan')+'</h2><span class="muted" style="font-size:.85rem">'+(status()==="drafted"?L("Vorschlag","Proposed"):L("Freigegeben","Approved"))+'</span></div>'+
         (d.summary?'<p class="muted" style="margin:0">'+esc(d.summary)+'</p>':'')+
         (d.prep?'<p class="cycle">'+esc(d.prep)+'</p>':'')+
-        (status()==="drafted"?'<p class="cycle">Ein Gericht antippen, um das Rezept zu sehen oder es zum Ersetzen zu markieren.</p><div><button type="button" class="btn small ghost" data-act="discardDraft">Entwurf verwerfen</button></div>':'')+'</div>';
-      h += blockHtml(nx, "Nächster Plan", t, false);
+        (status()==="drafted"?'<p class="cycle">'+L('Ein Gericht antippen, um das Rezept zu sehen oder es zum Ersetzen zu markieren.','Tap a meal to see its recipe or mark it to replace.')+'</p><div><button type="button" class="btn small ghost" data-act="discardDraft">'+L('Entwurf verwerfen','Discard draft')+'</button></div>':'')+'</div>';
+      h += blockHtml(nx, L("Nächster Plan","Next plan"), t, false);
     } else if(cy && status()==="active"){
-      h += '<div class="section"><div class="section-head"><h2>Nächster Plan</h2></div><p class="cycle">Entwurf am '+short(cy.draft)+', Einkaufsliste am '+short(cy.cart)+', Einkauf am '+short(cy.pickup)+'.</p><div>'+draftNowBtn()+'</div></div>';
+      h += '<div class="section"><div class="section-head"><h2>'+L('Nächster Plan','Next plan')+'</h2></div><p class="cycle">'+L('Entwurf am '+short(cy.draft)+', Einkaufsliste am '+short(cy.cart)+', Einkauf am '+short(cy.pickup)+'.','Draft on '+short(cy.draft)+', shopping list on '+short(cy.cart)+', shopping on '+short(cy.pickup)+'.')+'</p><div>'+draftNowBtn()+'</div></div>';
     }
     $("planDyn").innerHTML = h;
   }
@@ -673,37 +679,37 @@ h2{font-size:1.15rem;font-weight:700}
 
   function renderShop(){
     if(dbState==="none"){ ["nextList","staplesDyn","freezerDyn"].forEach(i=>$(i).innerHTML=""); return; }
-    if(dbState==="pending"){ $("nextList").innerHTML = '<div class="empty">Lade die Liste …</div>'; return; }
+    if(dbState==="pending"){ $("nextList").innerHTML = '<div class="empty">'+L('Lade die Liste …','Loading the list …')+'</div>'; return; }
     const sh = statusHtml("shop"); $("shopStatus").innerHTML = sh; $("shopStatus").hidden = !sh;
     const d = S.dplan;
     $("planGroWrap").hidden = !(d && d.groceries && d.groceries.length);
     if(d && d.groceries){
       $("planGroRange").textContent = d.start && d.end ? fmt(d.start,{month:"short",day:"numeric"})+" – "+fmt(d.end,{month:"short",day:"numeric"}) : "";
-      $("planGroDyn").innerHTML = d.groceries.map(g=>'<div class="gro"><span class="eyebrow">'+esc(g.section||"Einkauf")+'</span><ul>'+(g.items||[]).map(i=>'<li>'+itemLink(i)+'</li>').join("")+'</ul></div>').join("");
+      $("planGroDyn").innerHTML = d.groceries.map(g=>'<div class="gro"><span class="eyebrow">'+esc(g.section||L("Einkauf","Groceries"))+'</span><ul>'+(g.items||[]).map(i=>'<li>'+itemLink(i)+'</li>').join("")+'</ul></div>').join("");
     }
     const items = nextOrder();
-    $("nextCount").textContent = items.length ? items.length+" Artikel" : "";
+    $("nextCount").textContent = items.length ? items.length+L(" Artikel",items.length>1?" items":" item") : "";
     const badge = $("navBadge"); badge.hidden = !items.length; badge.textContent = items.length;
-    $("nextCountWide").textContent = items.length ? items.length+" Artikel" : "";
+    $("nextCountWide").textContent = items.length ? items.length+L(" Artikel",items.length>1?" items":" item") : "";
     $("nextList").innerHTML = items.length
-      ? '<ul class="list">'+items.map(i=>'<li><span class="txt">'+esc(i.text)+(i.kind==="low"?' <span class="tag">· Vorrat</span>':'')+'</span>'+
+      ? '<ul class="list">'+items.map(i=>'<li><span class="txt">'+esc(i.text)+(i.kind==="low"?' <span class="tag">· '+L('Vorrat','pantry')+'</span>':'')+'</span>'+
           (i.kind==="add"
-            ? '<button type="button" class="iconbtn" data-act="delGrocery" data-id="'+esc(i.id)+'" aria-label="Entfernen: '+esc(i.text)+'">'+X+'</button>'
-            : '<button type="button" class="btn small ghost" data-act="staple" data-id="'+esc(i.id)+'" data-v="have">Ist da</button>')+'</li>').join("")+'</ul>'
-      : '<div class="empty">Noch nichts. Oben hinzufügen oder Vorrat als knapp markieren.</div>';
+            ? '<button type="button" class="iconbtn" data-act="delGrocery" data-id="'+esc(i.id)+'" aria-label="'+L('Entfernen: ','Remove: ')+esc(i.text)+'">'+X+'</button>'
+            : '<button type="button" class="btn small ghost" data-act="staple" data-id="'+esc(i.id)+'" data-v="have">'+L('Ist da','Have it')+'</button>')+'</li>').join("")+'</ul>'
+      : '<div class="empty">'+L('Noch nichts. Oben hinzufügen oder Vorrat als knapp markieren.','Nothing yet. Add items above or mark a staple as low.')+'</div>';
     const groups = {};
     S.staples.slice().sort((a,b)=>(a.order||0)-(b.order||0)).forEach(s=>{ (groups[s.group||"Vorrat"] = groups[s.group||"Vorrat"]||[]).push(s); });
     $("staplesDyn").innerHTML = Object.keys(groups).length ? Object.keys(groups).map(g=>
       '<div class="stack" style="gap:6px"><span class="eyebrow">'+esc(g)+'</span><ul class="list">'+groups[g].map(s=>
-        '<li><span class="txt">'+esc(s.name)+(s.status==="unknown"?' <span class="tag">· nicht geprüft</span>':'')+'</span><span class="seg" role="group" aria-label="'+esc(s.name)+' status">'+
-        '<button type="button" class="have'+(s.status==="have"?" on":"")+'" data-act="staple" data-id="'+esc(s.id)+'" data-v="have" aria-pressed="'+(s.status==="have")+'">Da</button>'+
-        '<button type="button" class="low'+(s.status==="low"?" on":"")+'" data-act="staple" data-id="'+esc(s.id)+'" data-v="low" aria-pressed="'+(s.status==="low")+'">Knapp</button></span><button type="button" class="iconbtn" data-act="delStaple" data-id="'+esc(s.id)+'" aria-label="Aus dem Vorrat entfernen: '+esc(s.name)+'">'+X+'</button></li>').join("")+'</ul></div>').join("")
-      : '<div class="empty">Noch kein Vorrat eingetragen.</div>';
+        '<li><span class="txt">'+esc(s.name)+(s.status==="unknown"?' <span class="tag">· '+L('nicht geprüft','not checked')+'</span>':'')+'</span><span class="seg" role="group" aria-label="'+esc(s.name)+' status">'+
+        '<button type="button" class="have'+(s.status==="have"?" on":"")+'" data-act="staple" data-id="'+esc(s.id)+'" data-v="have" aria-pressed="'+(s.status==="have")+'">'+L('Da','Have')+'</button>'+
+        '<button type="button" class="low'+(s.status==="low"?" on":"")+'" data-act="staple" data-id="'+esc(s.id)+'" data-v="low" aria-pressed="'+(s.status==="low")+'">'+L('Knapp','Low')+'</button></span><button type="button" class="iconbtn" data-act="delStaple" data-id="'+esc(s.id)+'" aria-label="'+L('Aus dem Vorrat entfernen: ','Remove from pantry: ')+esc(s.name)+'">'+X+'</button></li>').join("")+'</ul></div>').join("")
+      : '<div class="empty">'+L('Noch kein Vorrat eingetragen.','No staples yet.')+'</div>';
     $("nextListWide").innerHTML = $("nextList").innerHTML;
     const fz = S.freezer.slice().sort((a,b)=>(a.at||"")<(b.at||"")?-1:1);
     $("freezerDyn").innerHTML = fz.length
-      ? '<ul class="list">'+fz.map(f=>'<li><span class="txt">'+esc(f.name)+(f.forMeal?' <span class="tag">· '+esc(f.forMeal)+'</span>':'')+'</span><button type="button" class="btn small ghost" data-act="delFreezer" data-id="'+esc(f.id)+'">Verbraucht</button></li>').join("")+'</ul>'
-      : '<div class="empty">Der Gefrierschrank ist leer.</div>';
+      ? '<ul class="list">'+fz.map(f=>'<li><span class="txt">'+esc(f.name)+(f.forMeal?' <span class="tag">· '+esc(f.forMeal)+'</span>':'')+'</span><button type="button" class="btn small ghost" data-act="delFreezer" data-id="'+esc(f.id)+'">'+L('Verbraucht','Used')+'</button></li>').join("")+'</ul>'
+      : '<div class="empty">'+L('Der Gefrierschrank ist leer.','The freezer is empty.')+'</div>';
     $("freezerWide").innerHTML = $("freezerDyn").innerHTML;
   }
 
@@ -712,52 +718,55 @@ h2{font-size:1.15rem;font-weight:700}
     if(dbState==="pending") return;
     const ideas = S.ideas.slice().sort((a,b)=>(a.at||"")<(b.at||"")?1:-1);
     $("ideasDyn").innerHTML = ideas.length
-      ? '<ul class="list">'+ideas.map(i=>'<li><span class="txt">'+esc(i.text)+'</span><button type="button" class="iconbtn" data-act="delIdea" data-id="'+esc(i.id)+'" aria-label="Wunsch entfernen">'+X+'</button></li>').join("")+'</ul>'
-      : '<div class="empty">Noch keine Wünsche.</div>';
+      ? '<ul class="list">'+ideas.map(i=>'<li><span class="txt">'+esc(i.text)+'</span><button type="button" class="iconbtn" data-act="delIdea" data-id="'+esc(i.id)+'" aria-label="'+L('Wunsch entfernen','Remove request')+'">'+X+'</button></li>').join("")+'</ul>'
+      : '<div class="empty">'+L('Noch keine Wünsche.','No requests yet.')+'</div>';
     const cooks = S.meals.concat(S.draft, S.history).filter(m=>m.kind==="cook" && m.date<=today()).sort(byDate).reverse();
     $("ratingsDyn").innerHTML = cooks.length
       ? '<div class="list" style="overflow:hidden">'+cooks.map(m=>{ const ns = notesFor(m.id);
-          return '<button type="button" class="rrow" data-act="open" data-id="'+esc(m.id)+'"><span class="t">'+esc(m.title)+'</span>'+(m.rating?starsHtml(m,true):'<span class="muted" style="font-size:.85rem">Bewerten</span>')+
+          return '<button type="button" class="rrow" data-act="open" data-id="'+esc(m.id)+'"><span class="t">'+esc(m.title)+'</span>'+(m.rating?starsHtml(m,true):'<span class="muted" style="font-size:.85rem">'+L('Bewerten','Rate it')+'</span>')+
           '<span class="n">'+fmt(m.date,{weekday:"short",month:"short",day:"numeric"})+(ns.length?' · “'+esc(ns[ns.length-1].text)+'”':'')+'</span></button>'; }).join("")+'</div>'
-      : '<div class="empty">Bewertungen erscheinen hier nach jedem Kochabend.</div>';
+      : '<div class="empty">'+L('Bewertungen erscheinen hier nach jedem Kochabend.','Ratings show up here after each cook night.')+'</div>';
     if(document.activeElement!==$("guideInput")){
-      $("guideDyn").innerHTML = S.plan && S.plan.guidelines ? '<p>'+esc(S.plan.guidelines)+'</p>' : '<p>Noch keine Richtlinien gespeichert.</p>';
+      $("guideDyn").innerHTML = S.plan && S.plan.guidelines ? '<p>'+esc(S.plan.guidelines)+'</p>' : '<p>'+L('Noch keine Richtlinien gespeichert.','No guidelines saved yet.')+'</p>';
     }
     const ai = CFG.llm && CFG.llm!=="none";
     $("setupDyn").innerHTML =
-      '<li><span class="txt">KI für Pläne und Rezepte</span><span class="val">'+(ai?esc(aiName()):"aus")+'</span></li>'+
-      '<li><span class="txt">Zeitplan</span><span class="val">Plan '+esc(CFG.draftDay||"")+' · Liste '+esc(CFG.listDay||"")+' · Einkauf '+esc(CFG.shopDay||"")+'</span></li>'+
-      '<li><span class="txt">Supermarkt</span><span class="val">'+esc(storeName())+'</span></li>'+
-      '<li><span class="txt">Home Assistant</span>'+(CFG.notify?'<button type="button" class="btn small ghost" data-act="notifyTest">Test senden</button>':'<span class="val">nicht eingerichtet</span>')+'</li>';
+      '<li><span class="txt">'+L('Sprache','Language')+'</span><span class="seg" role="group" aria-label="'+L('Sprache','Language')+'">'+
+        ['de','en'].map(c=>'<button type="button" class="have'+(LANG===c?' on':'')+'" data-act="lang" data-v="'+c+'" aria-pressed="'+(LANG===c)+'">'+(c==='de'?'Deutsch':'English')+'</button>').join("")+'</span></li>'+
+      '<li><span class="txt">'+L('KI für Pläne und Rezepte','AI for plans and recipes')+'</span><span class="val">'+(ai?esc(aiName()):L("aus","off"))+'</span></li>'+
+      '<li><span class="txt">'+L('Zeitplan','Schedule')+'</span><span class="val">'+L('Plan ','Plan ')+esc(dayName(CFG.draftWd,""))+L(' · Liste ',' · list ')+esc(dayName(CFG.listWd,""))+L(' · Einkauf ',' · shopping ')+esc(dayName(CFG.shopWd,""))+'</span></li>'+
+      '<li><span class="txt">'+L('Supermarkt','Supermarket')+'</span><span class="val">'+esc(storeName())+'</span></li>'+
+      '<li><span class="txt">Home Assistant</span>'+(CFG.notify?'<button type="button" class="btn small ghost" data-act="notifyTest">'+L('Test senden','Send test')+'</button>':'<span class="val">'+L('nicht eingerichtet','not set up')+'</span>')+'</li>';
+    $("setupHint").innerHTML = L('Die Sprache gilt für den ganzen Haushalt – auch für Benachrichtigungen, Einkaufslisten und neue Rezepte. Alles andere wird in der Datei <code>.env</code> auf dem Server geändert.','The language applies to the whole household – including notifications, shopping lists and new recipes. Everything else is changed in the <code>.env</code> file on the server.');
   }
 
   function orderText(){
     const d = S.dplan || {};
     if(d.orderText) return d.orderText;
     const pickup = (S.plan && S.plan.pickup) || d.pickup || "";
-    const lines = ["Einkaufsliste für "+storeName()+(pickup?" – Einkauf "+pickup:""),""];
-    (d.groceries||[]).forEach(g=>{ lines.push(g.section||"Einkauf"); (g.items||[]).forEach(i=>lines.push("- "+i)); lines.push(""); });
+    const lines = [L("Einkaufsliste für ","Shopping list for ")+storeName()+(pickup?L(" – Einkauf "," – shopping ")+pickup:""),""];
+    (d.groceries||[]).forEach(g=>{ lines.push(g.section||L("Einkauf","Groceries")); (g.items||[]).forEach(i=>lines.push("- "+i)); lines.push(""); });
     const extra = nextOrder();
-    if(extra.length){ lines.push("Zusätzlich"); extra.forEach(i=>lines.push("- "+i.text)); lines.push(""); }
+    if(extra.length){ lines.push(L("Zusätzlich","Extras")); extra.forEach(i=>lines.push("- "+i.text)); lines.push(""); }
     return lines.join("\n").trim();
   }
   function copyOrder(){
     const text = orderText();
-    if(!text || text.split("\n").length<3){ toast("Es gibt noch keine Einkaufsliste. Sie entsteht mit dem nächsten Plan."); return; }
+    if(!text || text.split("\n").length<3){ toast(L("Es gibt noch keine Einkaufsliste. Sie entsteht mit dem nächsten Plan.","There’s no shopping list yet. It appears with the next plan.")); return; }
     const fallback = ()=>{ $("copyBox").value = text; $("copyScrim").hidden = false; $("copySheet").hidden = false; setTimeout(()=>{ $("copyBox").focus(); $("copyBox").select(); },50); };
     try{
-      navigator.clipboard.writeText(text).then(()=>toast("Liste kopiert."), fallback);
+      navigator.clipboard.writeText(text).then(()=>toast(L("Liste kopiert.","List copied.")), fallback);
     }catch(e){ fallback(); }
   }
 
   function recipeHtml(m){
     const r = m.recipe; if(!r) return "";
-    const fx = [r.serves?"Für "+r.serves+" Pers.":"", r.time||"", r.oven?"Ofen "+r.oven:""].filter(Boolean);
-    let h = '<div class="recipe"><div class="section-head"><h2>Rezept</h2><button type="button" class="btn small ghost" data-act="awake" aria-pressed="'+(!!wakeLock)+'">'+(wakeLock?"Bildschirm bleibt an":"Bildschirm anlassen")+'</button></div>';
+    const fx = [r.serves?L("Für "+r.serves+" Pers.","Serves "+r.serves):"", r.time||"", r.oven?L("Ofen ","Oven ")+r.oven:""].filter(Boolean);
+    let h = '<div class="recipe"><div class="section-head"><h2>'+L('Rezept','Recipe')+'</h2><button type="button" class="btn small ghost" data-act="awake" aria-pressed="'+(!!wakeLock)+'">'+(wakeLock?L("Bildschirm bleibt an","Screen stays on"):L("Bildschirm anlassen","Keep screen on"))+'</button></div>';
     if(fx.length) h += '<div class="rfacts">'+fx.map(f=>'<span class="fact">'+esc(f)+'</span>').join("")+'</div>';
-    h += '<span class="eyebrow">Zutaten · zum Abhaken antippen</span><ul class="ing">'+(r.ingredients||[]).map((x,i)=>{ const k = m.id+":i"+i, on = checked.has(k);
+    h += '<span class="eyebrow">'+L('Zutaten · zum Abhaken antippen','Ingredients · tap as you go')+'</span><ul class="ing">'+(r.ingredients||[]).map((x,i)=>{ const k = m.id+":i"+i, on = checked.has(k);
       return '<li><button type="button" data-act="tick" data-k="'+esc(k)+'" aria-pressed="'+on+'" class="'+(on?"on":"")+'"><span class="box" aria-hidden="true">'+(on?"✓":"")+'</span><span class="lbl">'+esc(x)+'</span></button></li>'; }).join("")+'</ul>';
-    h += '<span class="eyebrow" style="margin-top:8px">Zubereitung</span><ol class="steps">'+(r.steps||[]).map((x,i)=>{ const k = m.id+":s"+i, on = checked.has(k);
+    h += '<span class="eyebrow" style="margin-top:8px">'+L('Zubereitung','Steps')+'</span><ol class="steps">'+(r.steps||[]).map((x,i)=>{ const k = m.id+":s"+i, on = checked.has(k);
       return '<li><button type="button" data-act="tick" data-k="'+esc(k)+'" aria-pressed="'+on+'" class="'+(on?"on":"")+'"><span class="num">'+(i+1)+'</span><span>'+esc(x)+'</span></button></li>'; }).join("")+'</ol>';
     if(r.tip) h += '<p class="tip">'+esc(r.tip)+'</p>';
     return h+'</div>';
@@ -773,12 +782,12 @@ h2{font-size:1.15rem;font-weight:700}
       const el = document.documentElement;
       await (el.requestFullscreen ? el.requestFullscreen() : el.webkitRequestFullscreen());
     }catch(e){
-      toast("Dieser Browser erlaubt hier kein Vollbild. Eine Kiosk-App wie Fully Kiosk kann das.");
+      toast(L("Dieser Browser erlaubt hier kein Vollbild. Eine Kiosk-App wie Fully Kiosk kann das.","This browser won’t go full screen here. A kiosk app like Fully Kiosk can."));
     }
   }
   async function onFsChange(){
     const on = !!fsEl();
-    $("fsLabel").textContent = on ? "Vollbild beenden" : "Vollbild";
+    $("fsLabel").textContent = on ? L("Vollbild beenden","Exit full screen") : L("Vollbild","Full screen");
     $("fsBtn").setAttribute("aria-pressed", String(on));
     if(on){
       try{ fsLock = await navigator.wakeLock.request("screen"); }catch(e){ fsLock = null; }
@@ -799,8 +808,8 @@ h2{font-size:1.15rem;font-weight:700}
     try{
       wakeLock = await navigator.wakeLock.request("screen");
       wakeLock.addEventListener("release", ()=>{ wakeLock = null; if(openId) renderSheet(); });
-      toast("Der Bildschirm bleibt an, solange die Seite offen ist.");
-    }catch(e){ wakeLock = null; toast("Dieses Gerät lässt den Bildschirm nicht an. Bitte die automatische Sperre in den Einstellungen ausschalten."); }
+      toast(L("Der Bildschirm bleibt an, solange die Seite offen ist.","The screen stays on while this page is open."));
+    }catch(e){ wakeLock = null; toast(L("Dieses Gerät lässt den Bildschirm nicht an. Bitte die automatische Sperre in den Einstellungen ausschalten.","This device won’t keep the screen on from here. Turn off auto-lock in its settings instead.")); }
     if(openId) renderSheet();
   }
 
@@ -809,22 +818,22 @@ h2{font-size:1.15rem;font-weight:700}
     if(!m){ closeSheet(); return; }
     const next = mealOn(addDays(m.date,1));
     let h = '<div class="head"><div><span class="eyebrow">'+fmt(m.date,{weekday:"long",month:"short",day:"numeric"})+'</span><div class="meal-title" id="sheetTitle">'+esc(m.title)+'</div></div>'+
-      '<button type="button" class="iconbtn" data-act="close" aria-label="Schließen">'+X+'</button></div>'+
-      '<div class="stack" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+chip(m.kind)+(m.kind==="cook"?'<span class="muted" style="font-size:.85rem">Kochabend '+cookNo(m)+'</span>':'')+'</div>'+
+      '<button type="button" class="iconbtn" data-act="close" aria-label="'+L('Schließen','Close')+'">'+X+'</button></div>'+
+      '<div class="stack" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+chip(m.kind)+(m.kind==="cook"?'<span class="muted" style="font-size:.85rem">'+L('Kochabend ','Cook night ')+cookNo(m)+'</span>':'')+'</div>'+
       (m.details?'<p>'+esc(m.details)+'</p>':'');
-    if(m.from){ const src = findMeal(m.from); if(src && src.recipe) h += '<button type="button" class="btn small ghost" style="align-self:flex-start" data-act="open" data-id="'+esc(src.id)+'">Rezept vom '+fmt(src.date,{weekday:"long"})+'</button>'; }
-    if(m.thaw) h += '<div class="thaw">'+SNOW+'<div class="body"><span><strong>Am Vorabend auftauen:</strong> '+esc(m.thaw)+'.'+(m.thawDone?' Liegt im Kühlschrank.':'')+'</span>'+(m.thawDone||proposed(m)||m._col==="history"?'':'<div><button class="btn small ice" type="button" data-act="thaw" data-id="'+esc(m.id)+'">Erledigt, liegt im Kühlschrank</button></div>')+'</div></div>';
-    if(next && next.thaw && !next.thawDone) h += '<span class="thawline">'+SNOW.replace('class="ico"','width="14" height="14"')+'Heute Abend '+esc(next.thaw)+' für morgen in den Kühlschrank legen.</span>';
-    if(m.date<=today() || m.rating) h += '<div><span class="eyebrow">Eure Bewertung</span><div>'+starsHtml(m,false)+'</div></div>';
-    if(m.recipeId && S.recipes.find(r=>r.id===m.recipeId)) h += '<div><button type="button" class="btn small ghost" data-act="recipeOpen" data-id="'+esc(m.recipeId)+'">In der Rezeptdatenbank ansehen</button></div>';
-    else if(m.recipe && m.kind!=="leftovers") h += '<div><button type="button" class="btn small ghost" data-act="saveMealRecipe" data-id="'+esc(m.id)+'">In die Rezeptdatenbank übernehmen</button></div>';
+    if(m.from){ const src = findMeal(m.from); if(src && src.recipe) h += '<button type="button" class="btn small ghost" style="align-self:flex-start" data-act="open" data-id="'+esc(src.id)+'">'+L('Rezept vom '+fmt(src.date,{weekday:"long"}),fmt(src.date,{weekday:"long"})+'’s recipe')+'</button>'; }
+    if(m.thaw) h += '<div class="thaw">'+SNOW+'<div class="body"><span>'+L('<strong>Am Vorabend auftauen:</strong> ','<strong>Thaw the night before:</strong> ')+esc(m.thaw)+'.'+(m.thawDone?L(' Liegt im Kühlschrank.',' It’s in the fridge.'):'')+'</span>'+(m.thawDone||proposed(m)||m._col==="history"?'':'<div><button class="btn small ice" type="button" data-act="thaw" data-id="'+esc(m.id)+'">'+L('Erledigt, liegt im Kühlschrank','Done, it’s in the fridge')+'</button></div>')+'</div></div>';
+    if(next && next.thaw && !next.thawDone) h += '<span class="thawline">'+SNOW.replace('class="ico"','width="14" height="14"')+L('Heute Abend '+esc(next.thaw)+' für morgen in den Kühlschrank legen.','Tonight, move '+esc(next.thaw)+' to the fridge for tomorrow.')+'</span>';
+    if(m.date<=today() || m.rating) h += '<div><span class="eyebrow">'+L('Eure Bewertung','Your rating')+'</span><div>'+starsHtml(m,false)+'</div></div>';
+    if(m.recipeId && S.recipes.find(r=>r.id===m.recipeId)) h += '<div><button type="button" class="btn small ghost" data-act="recipeOpen" data-id="'+esc(m.recipeId)+'">'+L('In der Rezeptdatenbank ansehen','View in recipe database')+'</button></div>';
+    else if(m.recipe && m.kind!=="leftovers") h += '<div><button type="button" class="btn small ghost" data-act="saveMealRecipe" data-id="'+esc(m.id)+'">'+L('In die Rezeptdatenbank übernehmen','Save to recipe database')+'</button></div>';
     h += '</div>' + recipeHtml(m);
     $("sheetDyn").innerHTML = h;
     const ns = notesFor(m.id);
-    $("sheetNotes").innerHTML = ns.length ? ns.map(n=>'<li><span class="txt">'+esc(n.text)+(n.at?'<time>'+new Date(n.at).toLocaleDateString("de-DE",{month:"short",day:"numeric"})+'</time>':'')+'</span><button type="button" class="iconbtn" data-act="delNote" data-id="'+esc(n.id)+'" aria-label="Notiz löschen">'+X+'</button></li>').join("") : '<li class="muted" style="background:transparent;padding-left:0">Noch keine Notizen.</li>';
+    $("sheetNotes").innerHTML = ns.length ? ns.map(n=>'<li><span class="txt">'+esc(n.text)+(n.at?'<time>'+new Date(n.at).toLocaleDateString(LOC(),{month:"short",day:"numeric"})+'</time>':'')+'</span><button type="button" class="iconbtn" data-act="delNote" data-id="'+esc(n.id)+'" aria-label="'+L('Notiz löschen','Delete note')+'">'+X+'</button></li>').join("") : '<li class="muted" style="background:transparent;padding-left:0">'+L('Noch keine Notizen.','No notes yet.')+'</li>';
     const fixed = m.date<today() || proposed(m) || m._col==="history";
     $("replaceWrap").hidden = !proposed(m);
-    $("replaceBtn").innerHTML = proposed(m) ? '<button type="button" class="btn small'+(m.swapOut?'':' ghost')+'" data-act="swapout" data-id="'+esc(m.id)+'" aria-pressed="'+(!!m.swapOut)+'">'+(m.swapOut?'Wird ersetzt – antippen zum Behalten':'Dieses Gericht ersetzen')+'</button>' : "";
+    $("replaceBtn").innerHTML = proposed(m) ? '<button type="button" class="btn small'+(m.swapOut?'':' ghost')+'" data-act="swapout" data-id="'+esc(m.id)+'" aria-pressed="'+(!!m.swapOut)+'">'+(m.swapOut?L('Wird ersetzt – antippen zum Behalten','Marked to replace – tap to keep it'):L('Dieses Gericht ersetzen','Replace this meal'))+'</button>' : "";
     $("pushWrap").hidden = fixed;
     $("pushBtns").innerHTML = fixed ? "" : pushHtml(m,false);
     const others = meals().filter(x=>x.id!==m.id && x.date>=today() && !proposed(x));
@@ -847,37 +856,37 @@ h2{font-size:1.15rem;font-weight:700}
     const q = recipeQuery.toLowerCase();
     const list = S.recipes.filter(r=>!q || [r.title, r.description, ...(r.tags||[]), ...(r.ingredients||[])].join(" ").toLowerCase().includes(q))
       .sort((a,b)=>(a.title||"").localeCompare(b.title||"","de"));
-    $("recipeCount").textContent = S.recipes.length ? S.recipes.length+" Rezept"+(S.recipes.length>1?"e":"") : "";
-    $("recipesDyn").innerHTML = !S.loaded.recipes ? '<div class="empty">Lade die Rezepte …</div>'
-      : !S.recipes.length ? '<div class="empty">Noch keine Rezepte. Legt eigene an, importiert sie per Link'+(ai?' oder lasst die KI welche schreiben':'')+'. Gut bewertete Gerichte aus den Plänen landen automatisch hier.</div>'
-      : !list.length ? '<div class="empty">Nichts gefunden.</div>'
+    $("recipeCount").textContent = S.recipes.length ? S.recipes.length+L(" Rezept"+(S.recipes.length>1?"e":"")," recipe"+(S.recipes.length>1?"s":"")) : "";
+    $("recipesDyn").innerHTML = !S.loaded.recipes ? '<div class="empty">'+L('Lade die Rezepte …','Loading recipes …')+'</div>'
+      : !S.recipes.length ? '<div class="empty">'+L('Noch keine Rezepte. Legt eigene an, importiert sie per Link'+(ai?' oder lasst die KI welche schreiben':'')+'. Gut bewertete Gerichte aus den Plänen landen automatisch hier.','No recipes yet. Add your own, import them from a link'+(ai?' or let the AI write some':'')+'. Well-rated meals from your plans land here automatically.')+'</div>'
+      : !list.length ? '<div class="empty">'+L('Nichts gefunden.','Nothing found.')+'</div>'
       : '<ul class="rlist">'+list.map(r=>{ const st = recipeRating(r.id);
           return '<li><button type="button" data-act="recipeOpen" data-id="'+esc(r.id)+'"><span class="t">'+esc(r.title)+'</span>'+(st.avg?starsHtml({rating:Math.round(st.avg)},true):'<span></span>')+
-            '<span class="n">'+[r.time, r.serves?"für "+r.serves:"", st.count?st.count+"× gekocht":"", (r.tags||[]).slice(0,3).join(", ")].filter(Boolean).map(esc).join(" · ")+'</span></button></li>'; }).join("")+'</ul>';
+            '<span class="n">'+[r.time, r.serves?L("für ","serves ")+r.serves:"", st.count?st.count+L("× gekocht","× cooked"):"", (r.tags||[]).slice(0,3).join(", ")].filter(Boolean).map(esc).join(" · ")+'</span></button></li>'; }).join("")+'</ul>';
     const tool = $("recipeTool");
     if(!toolMode){ tool.innerHTML = ""; return; }
     if(tool.dataset.mode===toolMode && tool.innerHTML) { tool.querySelectorAll("button,input,textarea").forEach(el=>{ el.disabled = toolBusy; }); return; }
     tool.dataset.mode = toolMode;
     const spec = {
-      url: {label:"Link zum Rezept", input:'<input id="toolInput" type="url" placeholder="https://www.chefkoch.de/rezepte/…" required>', btn:"Importieren", hint:"Funktioniert mit den meisten Rezeptseiten (Chefkoch, REWE, Lecker, Kitchen Stories …)."+(ai?" Englische Rezepte werden ins Metrische umgerechnet.":"")},
-      text: {label:"Rezepttext", input:'<textarea id="toolInput" rows="8" placeholder="Rezept hier einfügen – abgetippt, aus einer Nachricht oder einem Dokument" required></textarea>', btn:"Umwandeln", hint:"Die KI macht daraus ein sauberes Rezept mit metrischen Einheiten."},
-      ai: {label:"Was soll es sein?", input:'<input id="toolInput" type="text" placeholder="z. B. vegetarisches Ofengericht mit Kürbis, 30 Minuten" required>', btn:"Rezept erfinden", hint:"Die KI berücksichtigt eure Ernährungsrichtlinien."}
+      url: {label:L("Link zum Rezept","Recipe link"), input:'<input id="toolInput" type="url" placeholder="https://www.chefkoch.de/rezepte/…" required>', btn:L("Importieren","Import"), hint:L("Funktioniert mit den meisten Rezeptseiten (Chefkoch, REWE, Lecker, Kitchen Stories …).","Works with most recipe sites (Chefkoch, REWE, BBC Good Food, Kitchen Stories …).")+(ai?L(" Englische Rezepte werden ins Metrische umgerechnet."," Imperial units are converted to metric."):"")},
+      text: {label:L("Rezepttext","Recipe text"), input:'<textarea id="toolInput" rows="8" placeholder="'+L('Rezept hier einfügen – abgetippt, aus einer Nachricht oder einem Dokument','Paste a recipe here – typed up, from a message or a document')+'" required></textarea>', btn:L("Umwandeln","Convert"), hint:L("Die KI macht daraus ein sauberes Rezept mit metrischen Einheiten.","The AI turns it into a clean recipe with metric units.")},
+      ai: {label:L("Was soll es sein?","What would you like?"), input:'<input id="toolInput" type="text" placeholder="'+L('z. B. vegetarisches Ofengericht mit Kürbis, 30 Minuten','e.g. vegetarian traybake with squash, 30 minutes')+'" required>', btn:L("Rezept erfinden","Create recipe"), hint:L("Die KI berücksichtigt eure Ernährungsrichtlinien.","The AI follows your dietary guidelines.")}
     }[toolMode];
     tool.innerHTML = '<form class="tool" id="toolForm" style="margin-top:10px" autocomplete="off"><label class="field">'+spec.label+spec.input+'</label><p class="muted" style="margin:0;font-size:.88rem">'+spec.hint+'</p>'+
-      '<div class="row-btns"><button class="btn small" type="submit">'+spec.btn+'</button><button class="btn small ghost" type="button" data-act="recipeTool" data-mode="">Abbrechen</button></div></form>';
+      '<div class="row-btns"><button class="btn small" type="submit">'+spec.btn+'</button><button class="btn small ghost" type="button" data-act="recipeTool" data-mode="">'+L('Abbrechen','Cancel')+'</button></div></form>';
     setTimeout(()=>{ const i = $("toolInput"); if(i) i.focus(); }, 30);
   }
   async function runTool(){
     const val = ($("toolInput").value||"").trim(); if(!val || toolBusy) return;
     const ep = {url:["/api/recipes/import-url",{url:val}], text:["/api/recipes/from-text",{text:val}], ai:["/api/recipes/generate",{wish:val}]}[toolMode];
     toolBusy = true; renderRecipes();
-    toast(toolMode==="url" ? "Lade das Rezept …" : (aiName()||"Die KI")+" schreibt das Rezept …");
+    toast(toolMode==="url" ? L("Lade das Rezept …","Loading the recipe …") : (aiName()||L("Die KI","The AI"))+L(" schreibt das Rezept …"," is writing the recipe …"));
     try{
       const r = await window.SB.api("POST", ep[0], ep[1]);
       toolMode = ""; $("recipeTool").innerHTML = "";
       openRecipe(null, "edit", r);
-      toast("Bitte prüfen und speichern.");
-    }catch(e){ toast(e.message || "Das hat nicht geklappt."); }
+      toast(L("Bitte prüfen und speichern.","Please check and save."));
+    }catch(e){ toast(e.message || L("Das hat nicht geklappt.","That didn’t work.")); }
     finally{ toolBusy = false; renderRecipes(); }
   }
   function openRecipe(id, mode, data){
@@ -895,33 +904,33 @@ h2{font-size:1.15rem;font-weight:700}
     // Direkt nach dem Speichern ist das Rezept evtl. noch nicht per Live-Update angekommen.
     const r = rOpen.id && rOpen.mode==="view" ? (S.recipes.find(x=>x.id===rOpen.id) || (rOpen.data && rOpen.data.id===rOpen.id ? rOpen.data : null)) : rOpen.data;
     if(!r){ closeRecipe(); return; }
-    const head = (title)=>'<div class="head"><div><span class="eyebrow">Rezept</span><div class="meal-title" id="rsheetTitle">'+esc(title)+'</div></div><button type="button" class="iconbtn" data-act="recipeClose" aria-label="Schließen">'+X+'</button></div>';
+    const head = (title)=>'<div class="head"><div><span class="eyebrow">'+L('Rezept','Recipe')+'</span><div class="meal-title" id="rsheetTitle">'+esc(title)+'</div></div><button type="button" class="iconbtn" data-act="recipeClose" aria-label="'+L('Schließen','Close')+'">'+X+'</button></div>';
     if(rOpen.mode==="view"){
       const st = recipeRating(r.id);
-      const src = r.source && /^https?:/.test(r.source) ? '<a href="'+esc(r.source)+'" target="_blank" rel="noopener">Originalrezept</a>' : esc(r.source||"");
+      const src = r.source && /^https?:/.test(r.source) ? '<a href="'+esc(r.source)+'" target="_blank" rel="noopener">'+L('Originalrezept','Original recipe')+'</a>' : esc(r.source||"");
       $("rsheetDyn").innerHTML = head(r.title)+'<div class="stack" style="margin-top:10px">'+
         (r.description?'<p>'+esc(r.description)+'</p>':'')+
         ((r.tags||[]).length?'<div class="row-btns">'+tagChips(r.tags)+'</div>':'')+
-        '<p class="muted" style="font-size:.88rem">'+[st.avg?"Ø "+st.avg.toFixed(1).replace(".",",")+" Sterne":"", st.count?st.count+"× gekocht":"noch nicht gekocht", src].filter(Boolean).join(" · ")+'</p>'+
-        '<form class="tool" id="scheduleForm"><label class="field">Einplanen am<input id="scheduleDate" type="date" value="'+freeDates()+'" required></label><div class="row-btns"><button class="btn small" type="submit">Einplanen</button></div></form>'+
-        '<div class="row-btns"><button type="button" class="btn small ghost" data-act="recipeEdit">Bearbeiten</button><button type="button" class="btn small ghost" data-act="recipeDelete">Löschen</button></div>'+
+        '<p class="muted" style="font-size:.88rem">'+[st.avg?"Ø "+L(st.avg.toFixed(1).replace(".",",")+" Sterne",st.avg.toFixed(1)+" stars"):"", st.count?st.count+L("× gekocht","× cooked"):L("noch nicht gekocht","not cooked yet"), src].filter(Boolean).join(" · ")+'</p>'+
+        '<form class="tool" id="scheduleForm"><label class="field">'+L('Einplanen am','Schedule for')+'<input id="scheduleDate" type="date" value="'+freeDates()+'" required></label><div class="row-btns"><button class="btn small" type="submit">'+L('Einplanen','Schedule')+'</button></div></form>'+
+        '<div class="row-btns"><button type="button" class="btn small ghost" data-act="recipeEdit">'+L('Bearbeiten','Edit')+'</button><button type="button" class="btn small ghost" data-act="recipeDelete">'+L('Löschen','Delete')+'</button></div>'+
         '</div>'+recipeHtml({id:"r:"+r.id, recipe:r});
       return;
     }
     const lines = a => esc((a||[]).join("\n"));
-    $("rsheetDyn").innerHTML = head(rOpen.id ? "Rezept bearbeiten" : "Neues Rezept")+
+    $("rsheetDyn").innerHTML = head(rOpen.id ? L("Rezept bearbeiten","Edit recipe") : L("Neues Rezept","New recipe"))+
       '<form class="stack" id="recipeForm" style="margin-top:12px" autocomplete="off">'+
-      '<label class="field">Titel<input name="title" type="text" required value="'+esc(r.title)+'"></label>'+
-      '<label class="field">Kurzbeschreibung<input name="description" type="text" value="'+esc(r.description||"")+'"></label>'+
-      '<div class="fields2"><label class="field">Portionen<input name="serves" type="number" min="0" inputmode="numeric" value="'+esc(r.serves||"")+'"></label>'+
-      '<label class="field">Zeit<input name="time" type="text" placeholder="z. B. 35 Min." value="'+esc(r.time||"")+'"></label>'+
-      '<label class="field">Ofen<input name="oven" type="text" placeholder="z. B. 200 °C Umluft" value="'+esc(r.oven||"")+'"></label></div>'+
-      '<label class="field">Zutaten (eine pro Zeile)<textarea name="ingredients" rows="8" placeholder="400 g Spaghetti&#10;2 Zehen Knoblauch">'+lines(r.ingredients)+'</textarea></label>'+
-      '<label class="field">Zubereitung (ein Schritt pro Zeile)<textarea name="steps" rows="8">'+lines(r.steps)+'</textarea></label>'+
-      '<label class="field">Tipp<input name="tip" type="text" value="'+esc(r.tip||"")+'"></label>'+
-      '<label class="field">Tags (mit Komma getrennt)<input name="tags" type="text" placeholder="vegetarisch, schnell" value="'+esc((r.tags||[]).join(", "))+'"></label>'+
-      '<label class="field">Quelle<input name="source" type="text" value="'+esc(r.source||"")+'"></label>'+
-      '<div class="row-btns"><button class="btn" type="submit">Speichern</button><button class="btn ghost" type="button" data-act="'+(rOpen.id?"recipeView":"recipeClose")+'">Abbrechen</button></div></form>';
+      '<label class="field">'+L('Titel','Title')+'<input name="title" type="text" required value="'+esc(r.title)+'"></label>'+
+      '<label class="field">'+L('Kurzbeschreibung','Short description')+'<input name="description" type="text" value="'+esc(r.description||"")+'"></label>'+
+      '<div class="fields2"><label class="field">'+L('Portionen','Servings')+'<input name="serves" type="number" min="0" inputmode="numeric" value="'+esc(r.serves||"")+'"></label>'+
+      '<label class="field">'+L('Zeit','Time')+'<input name="time" type="text" placeholder="'+L('z. B. 35 Min.','e.g. 35 min')+'" value="'+esc(r.time||"")+'"></label>'+
+      '<label class="field">'+L('Ofen','Oven')+'<input name="oven" type="text" placeholder="'+L('z. B. 200 °C Umluft','e.g. 200 °C fan')+'" value="'+esc(r.oven||"")+'"></label></div>'+
+      '<label class="field">'+L('Zutaten (eine pro Zeile)','Ingredients (one per line)')+'<textarea name="ingredients" rows="8" placeholder="'+L('400 g Spaghetti&#10;2 Zehen Knoblauch','400 g spaghetti&#10;2 cloves garlic')+'">'+lines(r.ingredients)+'</textarea></label>'+
+      '<label class="field">'+L('Zubereitung (ein Schritt pro Zeile)','Steps (one per line)')+'<textarea name="steps" rows="8">'+lines(r.steps)+'</textarea></label>'+
+      '<label class="field">'+L('Tipp','Tip')+'<input name="tip" type="text" value="'+esc(r.tip||"")+'"></label>'+
+      '<label class="field">'+L('Tags (mit Komma getrennt)','Tags (comma-separated)')+'<input name="tags" type="text" placeholder="'+L('vegetarisch, schnell','vegetarian, quick')+'" value="'+esc((r.tags||[]).join(", "))+'"></label>'+
+      '<label class="field">'+L('Quelle','Source')+'<input name="source" type="text" value="'+esc(r.source||"")+'"></label>'+
+      '<div class="row-btns"><button class="btn" type="submit">'+L('Speichern','Save')+'</button><button class="btn ghost" type="button" data-act="'+(rOpen.id?"recipeView":"recipeClose")+'">'+L('Abbrechen','Cancel')+'</button></div></form>';
   }
   async function saveRecipeForm(form){
     const f = new FormData(form), split = (v,re) => String(v||"").split(re).map(s=>s.trim()).filter(Boolean);
@@ -929,24 +938,24 @@ h2{font-size:1.15rem;font-weight:700}
       title: String(f.get("title")||"").trim(), description: String(f.get("description")||"").trim(),
       serves: parseInt(f.get("serves"),10) || 0, time: String(f.get("time")||"").trim(), oven: String(f.get("oven")||"").trim(),
       ingredients: split(f.get("ingredients"), /\n/), steps: split(f.get("steps"), /\n/), tip: String(f.get("tip")||"").trim(),
-      tags: split(f.get("tags"), /,/), source: String(f.get("source")||"").trim() || "eigenes Rezept"
+      tags: split(f.get("tags"), /,/), source: String(f.get("source")||"").trim() || L("eigenes Rezept","own recipe")
     };
     if(!data.title) return;
     const prev = rOpen.id ? S.recipes.find(r=>r.id===rOpen.id) : null;
     data.createdAt = (prev && prev.createdAt) || new Date().toISOString();
     let newId = rOpen.id;
-    const ok = await save(async()=>{ if(rOpen.id) await db.doc("recipes/"+rOpen.id).set(data); else newId = (await db.collection("recipes").add(data)).id; }, "Rezept gespeichert");
+    const ok = await save(async()=>{ if(rOpen.id) await db.doc("recipes/"+rOpen.id).set(data); else newId = (await db.collection("recipes").add(data)).id; }, L("Rezept gespeichert","Recipe saved"));
     if(ok){ rOpen = {id:newId, mode:"view", data:Object.assign({}, data, {id:newId})}; renderRecipeSheet(); $("rsheet").scrollTop = 0; }
   }
   async function scheduleRecipe(date){
     const r = S.recipes.find(x=>x.id===rOpen.id) || rOpen.data; if(!r || !r.id || !date) return;
     const recipe = {serves:r.serves, time:r.time, oven:r.oven, ingredients:r.ingredients, steps:r.steps, tip:r.tip};
     const existing = meals().find(m=>m.date===date);
-    if(existing && !confirm("Am "+fmt(date,{weekday:"long",day:"numeric",month:"numeric"})+" ist schon „"+existing.title+"“ geplant. Ersetzen?")) return;
+    if(existing && !confirm(L("Am "+fmt(date,{weekday:"long",day:"numeric",month:"numeric"})+" ist schon „"+existing.title+"“ geplant. Ersetzen?","“"+existing.title+"” is already planned for "+fmt(date,{weekday:"long",day:"numeric",month:"long"})+". Replace it?"))) return;
     const ok = await save(async()=>{
       if(existing) await mref(existing).update({title:r.title, details:r.description||"", kind:"cook", recipe, recipeId:r.id, swapOut:false, from:{__delete__:true}});
       else await db.doc("meals/m"+date.replace(/-/g,"")).set({date, kind:"cook", title:r.title, details:r.description||"", recipe, recipeId:r.id, thawDone:false, rating:0});
-    }, r.title+" ist für "+fmt(date,{weekday:"long"})+" eingeplant");
+    }, L(r.title+" ist für "+fmt(date,{weekday:"long"})+" eingeplant",r.title+" is scheduled for "+fmt(date,{weekday:"long"})));
     if(ok) closeRecipe();
   }
 
@@ -971,21 +980,21 @@ h2{font-size:1.15rem;font-weight:700}
   function toast(msg, undo){
     const el = $("toast"); el.textContent = ""; toastUndo = undo || null;
     const sp = document.createElement("span"); sp.textContent = msg; el.appendChild(sp);
-    if(undo){ const b = document.createElement("button"); b.type = "button"; b.dataset.act = "undo"; b.textContent = "Rückgängig"; el.appendChild(b); }
+    if(undo){ const b = document.createElement("button"); b.type = "button"; b.dataset.act = "undo"; b.textContent = L("Rückgängig","Undo"); el.appendChild(b); }
     el.hidden = false; clearTimeout(toastT); toastT = setTimeout(()=>{ el.hidden = true; toastUndo = null; }, undo ? 8000 : 2600);
   }
 
   async function save(fn, ok){
-    if(!db){ toast("Keine Verbindung zum Server."); return false; }
-    if(readOnly){ toast("Nur Lesezugriff."); return false; }
+    if(!db){ toast(L("Keine Verbindung zum Server.","No connection to the server.")); return false; }
+    if(readOnly){ toast(L("Nur Lesezugriff.","Read-only access.")); return false; }
     const run = async () => { await fn(); if(ok) toast(ok); return true; };
     try{ return await run(); }
     catch(e){
       const c = e && e.code;
-      if(c==="invalid_argument"){ readOnly = true; toast("Nur Lesezugriff."); }
-      else if(c==="unavailable"){ await new Promise(r=>setTimeout(r,500+Math.random()*700)); try{ return await run(); }catch(e2){ toast("Speichern fehlgeschlagen. Verbindung prüfen und erneut versuchen."); } }
-      else if(c==="quota_exceeded"){ toast("Der Speicher ist voll."); }
-      else toast((e&&e.message)||"Die Änderung konnte nicht gespeichert werden.");
+      if(c==="invalid_argument"){ readOnly = true; toast(L("Nur Lesezugriff.","Read-only access.")); }
+      else if(c==="unavailable"){ await new Promise(r=>setTimeout(r,500+Math.random()*700)); try{ return await run(); }catch(e2){ toast(L("Speichern fehlgeschlagen. Verbindung prüfen und erneut versuchen.","Couldn’t save. Check the connection and try again.")); } }
+      else if(c==="quota_exceeded"){ toast(L("Der Speicher ist voll.","Storage is full.")); }
+      else toast((e&&e.message)||L("Die Änderung konnte nicht gespeichert werden.","Couldn’t save that change."));
       return false;
     }
   }
@@ -1005,43 +1014,44 @@ h2{font-size:1.15rem;font-weight:700}
     else if(act==="push") pushBack(id, +b.dataset.n);
     else if(act==="undo"){ const fn = toastUndo; toastUndo = null; $("toast").hidden = true; if(fn) fn(); }
     else if(act==="tick"){ const k = b.dataset.k; if(checked.has(k)) checked.delete(k); else checked.add(k); renderSheet(); }
-    else if(act==="rate"){ const m = findMeal(id); if(!m) return; const v = +b.dataset.v; save(()=>mref(m).update({rating: m.rating===v ? 0 : v}), "Bewertung gespeichert"); }
-    else if(act==="thaw"){ const m = findMeal(id); if(m) save(()=>mref(m).update({thawDone:true}), "Auftauen vermerkt"); }
-    else if(act==="swapout"){ const m = findMeal(id); if(m) save(()=>mref(m).update({swapOut: !m.swapOut}), m.swapOut ? "Bleibt im Plan" : "Wird ersetzt"); }
-    else if(act==="approve") save(()=>db.doc("plan/current").update({status:"approved", approvedAt:new Date().toISOString()}), "Plan freigegeben");
+    else if(act==="rate"){ const m = findMeal(id); if(!m) return; const v = +b.dataset.v; save(()=>mref(m).update({rating: m.rating===v ? 0 : v}), L("Bewertung gespeichert","Rating saved")); }
+    else if(act==="thaw"){ const m = findMeal(id); if(m) save(()=>mref(m).update({thawDone:true}), L("Auftauen vermerkt","Marked as thawing")); }
+    else if(act==="swapout"){ const m = findMeal(id); if(m) save(()=>mref(m).update({swapOut: !m.swapOut}), m.swapOut ? L("Bleibt im Plan","Keeping it") : L("Wird ersetzt","Marked to replace")); }
+    else if(act==="approve") save(()=>db.doc("plan/current").update({status:"approved", approvedAt:new Date().toISOString()}), L("Plan freigegeben","Plan approved"));
     else if(act==="ordered") save(async()=>{
         const inc = (S.dplan && S.dplan.included) || {};
         for(const g of (inc.grocery||[])) if(S.grocery.find(x=>x.id===g)) await db.doc("grocery/"+g).delete();
         for(const st of (inc.staples||[])) if(S.staples.find(x=>x.id===st)) await db.doc("staples/"+st).update({status:"have"});
         await db.doc("plan/current").update({status:"ordered", orderedAt:new Date().toISOString(), statusNote:""});
-      }, "Als bestellt vermerkt");
+      }, L("Als bestellt vermerkt","Marked as bought"));
     else if(act==="swap"){
       const a = findMeal(b.dataset.a), c = findMeal(b.dataset.b); if(!a||!c) return;
       save(async()=>{ await mref(a).update({date:c.date}); await mref(c).update({date:a.date}); },
-        a.title+" ist jetzt am "+fmt(c.date,{weekday:"long"})).then(ok=>{ if(ok) closeSheet(); });
+        L(a.title+" ist jetzt am "+fmt(c.date,{weekday:"long"}),a.title+" is now on "+fmt(c.date,{weekday:"long"}))).then(ok=>{ if(ok) closeSheet(); });
     }
-    else if(act==="delNote") save(()=>db.doc("notes/"+id).delete(), "Notiz gelöscht");
+    else if(act==="delNote") save(()=>db.doc("notes/"+id).delete(), L("Notiz gelöscht","Note deleted"));
     else if(act==="delGrocery") save(()=>db.doc("grocery/"+id).delete());
     else if(act==="staple") save(()=>db.doc("staples/"+id).update({status:b.dataset.v}));
-    else if(act==="delFreezer") save(()=>db.doc("freezer/"+id).delete(), "Aus dem Gefrierschrank entfernt");
+    else if(act==="delFreezer") save(()=>db.doc("freezer/"+id).delete(), L("Aus dem Gefrierschrank entfernt","Removed from the freezer"));
     else if(act==="delIdea") save(()=>db.doc("ideas/"+id).delete());
     else if(act==="delStaple") save(()=>db.doc("staples/"+id).delete());
     else if(act==="draftNow" || act==="listNow"){
       window.SB.api("POST", act==="draftNow" ? "/api/actions/draft" : "/api/actions/list")
-        .then(()=>toast(act==="draftNow" ? "Der Plan wird erstellt …" : "Die Einkaufsliste wird erstellt …"), e=>toast(e.message));
+        .then(()=>toast(act==="draftNow" ? L("Der Plan wird erstellt …","Creating the plan …") : L("Die Einkaufsliste wird erstellt …","Creating the shopping list …")), e=>toast(e.message));
     }
-    else if(act==="discardDraft"){ if(confirm("Den Entwurf für den nächsten Plan verwerfen?")) window.SB.api("POST","/api/actions/discard-draft").then(()=>toast("Entwurf verworfen"), e=>toast(e.message)); }
+    else if(act==="discardDraft"){ if(confirm(L("Den Entwurf für den nächsten Plan verwerfen?","Discard the draft for the next plan?"))) window.SB.api("POST","/api/actions/discard-draft").then(()=>toast(L("Entwurf verworfen","Draft discarded")), e=>toast(e.message)); }
     else if(act==="dismissJob") save(()=>db.doc("plan/job").delete());
-    else if(act==="notifyTest") window.SB.api("POST","/api/actions/notify-test").then(()=>toast("Testnachricht gesendet"), e=>toast(e.message));
+    else if(act==="notifyTest") window.SB.api("POST","/api/actions/notify-test").then(()=>toast(L("Testnachricht gesendet","Test message sent")), e=>toast(e.message));
     else if(act==="guideEdit"){ $("guideInput").value = (S.plan && S.plan.guidelines) || ""; $("guideForm").hidden = false; $("guideDyn").hidden = true; $("guideEditBtn").hidden = true; $("guideInput").focus(); }
     else if(act==="guideCancel"){ $("guideForm").hidden = true; $("guideDyn").hidden = false; $("guideEditBtn").hidden = false; }
-    else if(act==="saveMealRecipe"){ const m = findMeal(id); if(m) window.SB.api("POST","/api/meals/"+m._col+"/"+m.id+"/save-recipe").then(()=>toast("In die Rezeptdatenbank übernommen"), e=>toast(e.message)); }
+    else if(act==="saveMealRecipe"){ const m = findMeal(id); if(m) window.SB.api("POST","/api/meals/"+m._col+"/"+m.id+"/save-recipe").then(()=>toast(L("In die Rezeptdatenbank übernommen","Saved to the recipe database")), e=>toast(e.message)); }
     else if(act==="recipeOpen"){ closeSheet(); openRecipe(id, "view"); }
     else if(act==="recipeNew") openRecipe(null, "edit");
     else if(act==="recipeClose") closeRecipe();
     else if(act==="recipeEdit"){ rOpen = {id:rOpen.id, mode:"edit", data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id))}; renderRecipeSheet(); }
     else if(act==="recipeView"){ rOpen = {id:rOpen.id, mode:"view"}; renderRecipeSheet(); }
-    else if(act==="recipeDelete"){ const r = S.recipes.find(x=>x.id===rOpen.id); if(r && confirm("„"+r.title+"“ aus der Rezeptdatenbank löschen?")) save(()=>db.doc("recipes/"+r.id).delete(), "Rezept gelöscht").then(ok=>{ if(ok) closeRecipe(); }); }
+    else if(act==="recipeDelete"){ const r = S.recipes.find(x=>x.id===rOpen.id); if(r && confirm(L("„"+r.title+"“ aus der Rezeptdatenbank löschen?","Delete “"+r.title+"” from the recipe database?"))) save(()=>db.doc("recipes/"+r.id).delete(), L("Rezept gelöscht","Recipe deleted")).then(ok=>{ if(ok) closeRecipe(); }); }
+    else if(act==="lang"){ const v = b.dataset.v; if(v!==LANG) save(()=>db.doc("plan/settings").set(Object.assign({}, S.settings||{}, {language:v}))).then(ok=>{ if(ok) setLang(v); }); }
     else if(act==="recipeTool"){ toolMode = b.dataset.mode || ""; $("recipeTool").innerHTML = ""; renderRecipes(); }
   });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if(rOpen) closeRecipe(); else if(openId) closeSheet(); } });
@@ -1056,31 +1066,82 @@ h2{font-size:1.15rem;font-weight:700}
   $("guideForm").addEventListener("submit", async e=>{
     e.preventDefault();
     const text = $("guideInput").value.trim();
-    if(await save(()=>db.doc("plan/current").update({guidelines:text}), "Richtlinien gespeichert")){ $("guideForm").hidden = true; $("guideDyn").hidden = false; $("guideEditBtn").hidden = false; }
+    if(await save(()=>db.doc("plan/current").update({guidelines:text}), L("Richtlinien gespeichert","Guidelines saved"))){ $("guideForm").hidden = true; $("guideDyn").hidden = false; $("guideEditBtn").hidden = false; }
   });
   $("stapleForm").addEventListener("submit", async e=>{
     e.preventDefault(); let name = $("addStaple").value.trim(); if(!name) return;
-    let group = "Vorrat"; const m = name.match(/^([^:]{2,30}):\s*(.+)$/); if(m){ group = m[1].trim(); name = m[2].trim(); }
+    let group = L("Vorrat","Pantry"); const m = name.match(/^([^:]{2,30}):\s*(.+)$/); if(m){ group = m[1].trim(); name = m[2].trim(); }
     const order = S.staples.reduce((a,s)=>Math.max(a, s.order||0), 0) + 1;
-    if(await save(()=>db.collection("staples").add({name, group, status:"have", order}), "Zum Vorrat hinzugefügt")) $("addStaple").value = "";
+    if(await save(()=>db.collection("staples").add({name, group, status:"have", order}), L("Zum Vorrat hinzugefügt","Added to the pantry"))) $("addStaple").value = "";
   });
 
   document.querySelectorAll(".js-add-grocery").forEach(f=>f.addEventListener("submit", async e=>{
     e.preventDefault(); const inp = f.querySelector("input"); const text = inp.value.trim(); if(!text) return;
-    if(await save(()=>db.collection("grocery").add({text, at:new Date().toISOString()}), "Auf die Einkaufsliste gesetzt")) inp.value = "";
+    if(await save(()=>db.collection("grocery").add({text, at:new Date().toISOString()}), L("Auf die Einkaufsliste gesetzt","Added to the shopping list"))) inp.value = "";
   }));
   $("noteForm").addEventListener("submit", async e=>{
     e.preventDefault(); const text = $("noteInput").value.trim(); if(!text || !openId) return;
-    if(await save(()=>db.collection("notes").add({meal:openId, text, at:new Date().toISOString()}), "Notiz gespeichert")) $("noteInput").value = "";
+    if(await save(()=>db.collection("notes").add({meal:openId, text, at:new Date().toISOString()}), L("Notiz gespeichert","Note saved"))) $("noteInput").value = "";
   });
   $("ideaForm").addEventListener("submit", async e=>{
     e.preventDefault(); const text = $("addIdea").value.trim(); if(!text) return;
-    if(await save(()=>db.collection("ideas").add({text, at:new Date().toISOString()}), "Wunsch gespeichert")) $("addIdea").value = "";
+    if(await save(()=>db.collection("ideas").add({text, at:new Date().toISOString()}), L("Wunsch gespeichert","Request saved"))) $("addIdea").value = "";
   });
   $("freezerForm").addEventListener("submit", async e=>{
     e.preventDefault(); const name = $("addFreezer").value.trim(); if(!name) return;
-    if(await save(()=>db.collection("freezer").add({name, at:new Date().toISOString()}), "Im Gefrierschrank vermerkt")) $("addFreezer").value = "";
+    if(await save(()=>db.collection("freezer").add({name, at:new Date().toISOString()}), L("Im Gefrierschrank vermerkt","Added to the freezer"))) $("addFreezer").value = "";
   });
+
+  // Feste Texte im HTML: deutsch im Markup, englisch aus dieser Tabelle
+  const STATIC_EN = {
+    "Der Plan kann gerade nicht geladen werden. Läuft der Server?":"The plan can’t load right now. Is the server running?",
+    "Lade das Abendessen …":"Loading tonight’s dinner …",
+    "Auf die nächste Einkaufsliste":"Add to the next shopping list",
+    "z. B. Eier, Kaffee, Küchenrolle":"e.g. eggs, coffee, paper towels",
+    "Artikel für die nächste Einkaufsliste":"Item for the next shopping list",
+    "Hinzufügen":"Add", "Demnächst":"Coming up", "Nächster Einkauf":"Next shop", "Artikel hinzufügen":"Add an item",
+    "Im Gefrierschrank":"In the freezer",
+    "Alles hier kommt zusammen mit dem Einkauf für den neuen Plan auf die nächste Einkaufsliste.":"Everything here goes on the next shopping list together with the new plan’s groceries.",
+    "Einkauf für den nächsten Plan":"Groceries for the next plan",
+    "Vor dem Einkauf wird daraus zusammen mit der Liste oben eine gemeinsame Einkaufsliste.":"Before shopping, these are combined with the list above into one shopping list.",
+    "Ganze Einkaufsliste kopieren":"Copy full shopping list", "Grundvorrat":"Pantry staples",
+    "Was knapp ist, kommt automatisch auf die nächste Einkaufsliste.":"Anything marked low goes on the next shopping list automatically.",
+    "z. B. Kaffee oder „Gewürze: Zimt“":"e.g. coffee or “Spices: cinnamon”", "Zum Grundvorrat hinzufügen":"Add to pantry staples",
+    "z. B. Hähnchenschenkel, ca. 1 kg":"e.g. chicken thighs, approx. 1 kg", "Neu im Gefrierschrank":"New in the freezer",
+    "Wünsche für den nächsten Plan":"Requests for the next plan",
+    "Gerichte zum Ausprobieren, was weg soll, volle Abende. Wird vor jedem neuen Plan gelesen.":"Meals to try, things to skip, busy nights. Read before every new plan.",
+    "z. B. mehr Fisch, dienstags nichts Scharfes":"e.g. more fish, nothing spicy on Tuesdays", "Wunsch für den nächsten Plan":"Request for the next plan",
+    "Bewertungen":"Ratings", "Ernährungsrichtlinien":"Dietary guidelines",
+    "Feste Regeln für jeden Plan: Rhythmus, Allergien, was ihr nicht esst.":"Fixed rules for every plan: rhythm, allergies, what you don’t eat.",
+    "Lade …":"Loading …", "Speichern":"Save", "Abbrechen":"Cancel", "Bearbeiten":"Edit", "Einrichtung":"Setup",
+    "Rezepte, Zutaten oder Tags suchen":"Search recipes, ingredients or tags", "Rezepte durchsuchen":"Search recipes",
+    "Neues Rezept":"New recipe", "Von Link importieren":"Import from link", "Text umwandeln":"Convert text", "Von KI erfinden lassen":"Let the AI invent one",
+    "Eure Rezepte":"Your recipes", "Bereiche":"Sections", "Heute":"Today", "Einkauf":"Shopping", "Rezepte":"Recipes", "Vollbild":"Full screen",
+    "Notizen":"Notes", "z. B. nächstes Mal mit Spaghettini":"e.g. try with thinner spaghetti next time", "Notiz zu diesem Gericht":"Note about this meal",
+    "Keine Lust darauf?":"Not feeling this one?",
+    "Markieren, dann wird das Gericht vor dem Einkauf ersetzt. Eine Notiz, was ihr lieber hättet, hilft dabei.":"Mark it and the meal is replaced before shopping. A note saying what you’d rather have helps.",
+    "Verschieben":"Push back", "Mit einem anderen Tag tauschen":"Swap with another day",
+    "Nur diese beiden Gerichte tauschen den Tag. Die Auftau-Erinnerung wandert mit.":"Only these two meals change days. The thaw reminder moves with each.",
+    "Einkaufsliste kopieren":"Copy the shopping list", "Schließen":"Close",
+    "Dieses Gerät erlaubt kein automatisches Kopieren. Die Liste ist unten markiert – einfach kopieren und in die Einkaufs-App einfügen.":"This device doesn’t allow automatic copying. The list is selected below – copy it and paste it into your shopping app.",
+    "Einkaufsliste":"Shopping list"
+  };
+  const staticText = [], staticAttr = [];
+  (function collectStatic(){
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let n; while((n = walker.nextNode())){ const k = n.nodeValue.trim(); if(k && STATIC_EN[k]) staticText.push([n, n.nodeValue, k]); }
+    document.querySelectorAll("[placeholder],[aria-label]").forEach(el=>["placeholder","aria-label"].forEach(a=>{ const v = el.getAttribute(a); if(v && STATIC_EN[v]) staticAttr.push([el, a, v]); }));
+  })();
+  function setLang(v){
+    LANG = v==="en" ? "en" : "de";
+    document.documentElement.lang = LANG;
+    if(window.SB) window.SB.lang = LANG;
+    staticText.forEach(([n, orig, k])=>{ n.nodeValue = LANG==="en" ? orig.replace(k, STATIC_EN[k]) : orig; });
+    staticAttr.forEach(([el, a, v])=>el.setAttribute(a, LANG==="en" ? STATIC_EN[v] : v));
+    toolMode = ""; $("recipeTool").innerHTML = "";
+    render();
+  }
+  const syncLang = () => { const v = (S.settings && S.settings.language) || CFG.language || "de"; if(v!==LANG) setLang(v); };
 
   const h0 = (location.hash||"").slice(1);
   setTab(["today","plan","shop","feedback","recipes"].includes(h0) ? h0 : "today");
@@ -1105,13 +1166,14 @@ h2{font-size:1.15rem;font-weight:700}
     });
     db.doc("plan/current").onSnapshot(s=>{ S.plan = s.exists ? s.data() : null; render(); }, ()=>{});
     db.doc("plan/draft").onSnapshot(s=>{ S.dplan = s.exists ? s.data() : null; render(); }, ()=>{});
+    db.doc("plan/settings").onSnapshot(s=>{ S.settings = s.exists ? s.data() : null; syncLang(); }, ()=>{});
     db.doc("plan/job").onSnapshot(s=>{
       const prev = S.job; S.job = s.exists ? s.data() : null;
       if(prev && prev.state==="running" && S.job && S.job.state==="done" && S.job.message) toast(S.job.message);
       render();
     }, ()=>{});
   })();
-  if(window.SB) window.SB.config.then(c=>{ CFG = c || {}; render(); });
+  if(window.SB) window.SB.config.then(c=>{ CFG = c || {}; syncLang(); render(); });
 })();
 </script>
 </body>
