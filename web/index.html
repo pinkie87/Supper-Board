@@ -233,6 +233,13 @@ h2{font-size:1.15rem;font-weight:700}
 .rlist button:focus-visible{outline:2px solid var(--basil);outline-offset:-2px}
 .rlist .t{font-weight:700}
 .rlist .n{grid-column:1/-1;font-size:.85rem;color:var(--muted)}
+.check{display:flex;gap:8px;align-items:center;font-size:.92rem}
+.implist{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.imp{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:start;padding:12px 14px;border-top:1px solid var(--line)}
+.imp:first-child{border-top:0}
+.imp img{width:56px;height:72px;object-fit:cover;border-radius:6px;background:var(--sunk)}
+.imp .what{display:flex;flex-direction:column;gap:6px;min-width:0}
+.srcimg{width:100%;border-radius:10px;border:1px solid var(--line)}
 .chip.tagchip{background:var(--sunk);color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700}
 @media (prefers-reduced-motion:no-preference){
   .sheet{animation:up .22s ease-out}
@@ -378,8 +385,13 @@ h2{font-size:1.15rem;font-weight:700}
         <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="url">Von Link importieren</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="text">Text umwandeln</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="ai">Von KI erfinden lassen</button>
+        <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="photo">Von Foto importieren</button>
       </div>
       <div id="recipeTool"></div>
+    </div>
+    <div class="section" id="importWrap" hidden>
+      <div class="section-head"><h2>Foto-Import</h2><span class="count" id="importCount"></span></div>
+      <div id="importsDyn"></div>
     </div>
     <div class="section">
       <div class="section-head"><h2>Eure Rezepte</h2><span class="count" id="recipeCount"></span></div>
@@ -452,7 +464,7 @@ h2{font-size:1.15rem;font-weight:700}
 
 <script>
 (function(){
-  const S = {meals:[],draft:[],history:[],notes:[],grocery:[],staples:[],freezer:[],ideas:[],recipes:[],plan:null,dplan:null,job:null,settings:null,loaded:{}};
+  const S = {meals:[],draft:[],history:[],notes:[],grocery:[],staples:[],freezer:[],ideas:[],recipes:[],imports:[],plan:null,dplan:null,job:null,settings:null,loaded:{}};
   let CFG = {};
   // Sprache: "de" oder "en", gilt für den ganzen Haushalt (plan/settings)
   let LANG = "de";
@@ -863,10 +875,20 @@ h2{font-size:1.15rem;font-weight:700}
       : '<ul class="rlist">'+list.map(r=>{ const st = recipeRating(r.id);
           return '<li><button type="button" data-act="recipeOpen" data-id="'+esc(r.id)+'"><span class="t">'+esc(r.title)+'</span>'+(st.avg?starsHtml({rating:Math.round(st.avg)},true):'<span></span>')+
             '<span class="n">'+[r.time, r.serves?L("für ","serves ")+r.serves:"", st.count?st.count+L("× gekocht","× cooked"):"", (r.tags||[]).slice(0,3).join(", ")].filter(Boolean).map(esc).join(" · ")+'</span></button></li>'; }).join("")+'</ul>';
+    renderImports();
     const tool = $("recipeTool");
     if(!toolMode){ tool.innerHTML = ""; return; }
     if(tool.dataset.mode===toolMode && tool.innerHTML) { tool.querySelectorAll("button,input,textarea").forEach(el=>{ el.disabled = toolBusy; }); return; }
     tool.dataset.mode = toolMode;
+    if(toolMode==="photo"){
+      tool.innerHTML = '<form class="tool" id="photoForm" style="margin-top:10px" autocomplete="off">'+
+        '<label class="field">'+L('Fotos von Rezeptseiten','Photos of recipe pages')+'<input id="photoInput" type="file" accept="image/*" multiple required></label>'+
+        '<label class="check"><input type="radio" name="photoMode" value="each" checked>'+L('Jedes Foto einzeln einlesen (z. B. ein Buch Seite für Seite)','Read each photo separately (e.g. a book page by page)')+'</label>'+
+        '<label class="check"><input type="radio" name="photoMode" value="together">'+L('Alle Fotos gehören zu einem Rezept','All photos belong to one recipe')+'</label>'+
+        '<p class="muted" style="margin:0;font-size:.88rem">'+L('Die Fotos werden im Hintergrund nacheinander gelesen – die Seite darf dabei geschlossen werden. Tipp: eine Seite pro Foto, gerade von oben, gutes Licht, kein Blitz.','Photos are read one after another in the background – you can close the page meanwhile. Tip: one page per photo, straight from above, good light, no flash.')+'</p>'+
+        '<div class="row-btns"><button class="btn small" type="submit">'+L('Hochladen','Upload')+'</button><button class="btn small ghost" type="button" data-act="recipeTool" data-mode="">'+L('Abbrechen','Cancel')+'</button></div></form>';
+      return;
+    }
     const spec = {
       url: {label:L("Link zum Rezept","Recipe link"), input:'<input id="toolInput" type="url" placeholder="https://www.chefkoch.de/rezepte/…" required>', btn:L("Importieren","Import"), hint:L("Funktioniert mit den meisten Rezeptseiten (Chefkoch, REWE, Lecker, Kitchen Stories …).","Works with most recipe sites (Chefkoch, REWE, BBC Good Food, Kitchen Stories …).")+(ai?L(" Englische Rezepte werden ins Metrische umgerechnet."," Imperial units are converted to metric."):"")},
       text: {label:L("Rezepttext","Recipe text"), input:'<textarea id="toolInput" rows="8" placeholder="'+L('Rezept hier einfügen – abgetippt, aus einer Nachricht oder einem Dokument','Paste a recipe here – typed up, from a message or a document')+'" required></textarea>', btn:L("Umwandeln","Convert"), hint:L("Die KI macht daraus ein sauberes Rezept mit metrischen Einheiten.","The AI turns it into a clean recipe with metric units.")},
@@ -875,6 +897,82 @@ h2{font-size:1.15rem;font-weight:700}
     tool.innerHTML = '<form class="tool" id="toolForm" style="margin-top:10px" autocomplete="off"><label class="field">'+spec.label+spec.input+'</label><p class="muted" style="margin:0;font-size:.88rem">'+spec.hint+'</p>'+
       '<div class="row-btns"><button class="btn small" type="submit">'+spec.btn+'</button><button class="btn small ghost" type="button" data-act="recipeTool" data-mode="">'+L('Abbrechen','Cancel')+'</button></div></form>';
     setTimeout(()=>{ const i = $("toolInput"); if(i) i.focus(); }, 30);
+  }
+  // ---------- Foto-Import ----------
+  function renderImports(){
+    const list = S.imports.slice().sort((a,b)=>(a.order||a.createdAt||"")<(b.order||b.createdAt||"")?-1:1);
+    $("importWrap").hidden = !list.length;
+    const open = list.reduce((n,i)=>n+(i.state==="done"?(i.recipes||[]).length:0), 0);
+    const pending = list.filter(i=>i.state==="waiting"||i.state==="working").length;
+    const errors = list.filter(i=>i.state==="error").length;
+    $("importCount").textContent = [open?L(open+" zu prüfen",open+" to review"):"", pending?L(pending+" in Arbeit",pending+" in progress"):""].filter(Boolean).join(" · ");
+    if(!list.length){ $("importsDyn").innerHTML = ""; return; }
+    $("importsDyn").innerHTML = (errors>1?'<div class="row-btns" style="margin-bottom:8px"><button type="button" class="btn small ghost" data-act="importRetryAll">'+L('Alle mit Fehler erneut versuchen','Retry all failed')+'</button></div>':'')+
+      '<div class="implist">'+list.map(i=>{
+        const img = '<img src="/api/imports/'+encodeURIComponent(i.id)+'/image/0" alt="" loading="lazy">';
+        const n = (i.images||[]).length, recs = i.recipes||[];
+        const pages = n>1 ? L(n+' Fotos',n+' photos')+' · ' : '';
+        let body;
+        if(i.state==="waiting") body = '<span class="muted">'+pages+L('Wartet …','Waiting …')+'</span>';
+        else if(i.state==="working") body = '<span>'+pages+'<b>'+L('Wird gelesen …','Reading …')+'</b></span>';
+        else if(i.state==="error") body = '<span class="muted">'+pages+L('Fehler: ','Error: ')+esc(i.message||"")+'</span>';
+        else if(recs.length) body = '<span>'+pages+L(recs.length+' Rezept'+(recs.length>1?'e':'')+' gefunden',recs.length+' recipe'+(recs.length>1?'s':'')+' found')+'</span><div class="row-btns">'+
+          recs.map((r,k)=>'<button type="button" class="btn small" data-act="importReview" data-id="'+esc(i.id)+'" data-i="'+k+'">'+L('Prüfen: ','Review: ')+esc(r.title)+'</button>').join("")+'</div>';
+        else body = '<span class="muted">'+pages+L('Kein Rezept erkannt.','No recipe found.')+'</span>';
+        const acts = (i.state==="error"||(i.state==="done"&&!recs.length)?'<button type="button" class="btn small ghost" data-act="importRetry" data-id="'+esc(i.id)+'">'+L('Erneut versuchen','Try again')+'</button>':'')+
+          (i.state!=="working"?'<button type="button" class="btn small ghost" data-act="importDiscard" data-id="'+esc(i.id)+'">'+L('Verwerfen','Discard')+'</button>':'');
+        return '<div class="imp">'+img+'<div class="what">'+body+(acts?'<div class="row-btns">'+acts+'</div>':'')+'</div></div>';
+      }).join("")+'</div>';
+  }
+  // Fotos im Browser verkleinern: spart Upload-Zeit und Rechenzeit des Modells
+  function shrinkPhoto(file, maxSide){
+    return new Promise((resolve, reject)=>{
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = ()=>{
+        const k = Math.min(1, maxSide/Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth*k); c.height = Math.round(img.naturalHeight*k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); resolve(c.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error(L("Dieses Foto kann der Browser nicht öffnen: ","The browser can’t open this photo: ")+file.name)); };
+      img.src = url;
+    });
+  }
+  async function uploadPhotos(form){
+    if(toolBusy) return;
+    const files = Array.from($("photoInput").files||[]); if(!files.length) return;
+    const together = (new FormData(form)).get("photoMode")==="together";
+    if(together && files.length>20){ toast(L("Höchstens 20 Fotos für ein Rezept.","At most 20 photos for one recipe.")); return; }
+    toolBusy = true; form.querySelectorAll("button,input").forEach(el=>{ el.disabled = true; });
+    try{
+      const batches = together ? [files] : Array.from({length:Math.ceil(files.length/10)}, (_,b)=>files.slice(b*10, b*10+10));
+      let done = 0;
+      for(const batch of batches){
+        const images = [];
+        for(const f of batch){ images.push(await shrinkPhoto(f, 2000)); }
+        await window.SB.api("POST", "/api/imports", {images, together});
+        done += batch.length;
+        toast(L("Hochgeladen: "+done+" von "+files.length,"Uploaded: "+done+" of "+files.length));
+      }
+      toolMode = ""; $("recipeTool").innerHTML = "";
+      toast(L("Fotos hochgeladen. Sie werden jetzt nacheinander gelesen.","Photos uploaded. They are now read one after another."));
+    }catch(e){ toast(e.message || L("Das hat nicht geklappt.","That didn’t work.")); }
+    finally{ toolBusy = false; renderRecipes(); }
+  }
+  function reviewImport(id, k){
+    const imp = S.imports.find(i=>i.id===id); const r = imp && (imp.recipes||[])[k]; if(!r) return;
+    openRecipe(null, "edit", Object.assign({}, r));
+    rOpen.importRef = {id, k, images:(imp.images||[]).length};
+    renderRecipeSheet();
+  }
+  async function finishImportRecipe(ref){
+    const imp = S.imports.find(i=>i.id===ref.id); if(!imp) return;
+    const rest = (imp.recipes||[]).filter((_,j)=>j!==ref.k);
+    try{
+      if(rest.length) await db.doc("imports/"+ref.id).update({recipes:rest});
+      else await window.SB.api("DELETE", "/api/imports/"+encodeURIComponent(ref.id));
+    }catch(e){ toast(e.message); }
   }
   async function runTool(){
     const val = ($("toolInput").value||"").trim(); if(!val || toolBusy) return;
@@ -930,7 +1028,9 @@ h2{font-size:1.15rem;font-weight:700}
       '<label class="field">'+L('Tipp','Tip')+'<input name="tip" type="text" value="'+esc(r.tip||"")+'"></label>'+
       '<label class="field">'+L('Tags (mit Komma getrennt)','Tags (comma-separated)')+'<input name="tags" type="text" placeholder="'+L('vegetarisch, schnell','vegetarian, quick')+'" value="'+esc((r.tags||[]).join(", "))+'"></label>'+
       '<label class="field">'+L('Quelle','Source')+'<input name="source" type="text" value="'+esc(r.source||"")+'"></label>'+
-      '<div class="row-btns"><button class="btn" type="submit">'+L('Speichern','Save')+'</button><button class="btn ghost" type="button" data-act="'+(rOpen.id?"recipeView":"recipeClose")+'">'+L('Abbrechen','Cancel')+'</button></div></form>';
+      '<div class="row-btns"><button class="btn" type="submit">'+L('Speichern','Save')+'</button><button class="btn ghost" type="button" data-act="'+(rOpen.id?"recipeView":"recipeClose")+'">'+L('Abbrechen','Cancel')+'</button></div></form>'+
+      (rOpen.importRef ? '<div class="stack" style="margin-top:16px"><span class="eyebrow">'+L('Foto zum Vergleich','Photo for comparison')+'</span>'+
+        Array.from({length:rOpen.importRef.images}, (_,n)=>'<img class="srcimg" src="/api/imports/'+encodeURIComponent(rOpen.importRef.id)+'/image/'+n+'" alt="">').join("")+'</div>' : '');
   }
   async function saveRecipeForm(form){
     const f = new FormData(form), split = (v,re) => String(v||"").split(re).map(s=>s.trim()).filter(Boolean);
@@ -943,9 +1043,12 @@ h2{font-size:1.15rem;font-weight:700}
     if(!data.title) return;
     const prev = rOpen.id ? S.recipes.find(r=>r.id===rOpen.id) : null;
     data.createdAt = (prev && prev.createdAt) || new Date().toISOString();
-    let newId = rOpen.id;
+    let newId = rOpen.id; const importRef = rOpen.importRef;
     const ok = await save(async()=>{ if(rOpen.id) await db.doc("recipes/"+rOpen.id).set(data); else newId = (await db.collection("recipes").add(data)).id; }, L("Rezept gespeichert","Recipe saved"));
-    if(ok){ rOpen = {id:newId, mode:"view", data:Object.assign({}, data, {id:newId})}; renderRecipeSheet(); $("rsheet").scrollTop = 0; }
+    if(ok){
+      if(importRef) await finishImportRecipe(importRef);
+      rOpen = {id:newId, mode:"view", data:Object.assign({}, data, {id:newId})}; renderRecipeSheet(); $("rsheet").scrollTop = 0;
+    }
   }
   async function scheduleRecipe(date){
     const r = S.recipes.find(x=>x.id===rOpen.id) || rOpen.data; if(!r || !r.id || !date) return;
@@ -1052,12 +1155,17 @@ h2{font-size:1.15rem;font-weight:700}
     else if(act==="recipeView"){ rOpen = {id:rOpen.id, mode:"view"}; renderRecipeSheet(); }
     else if(act==="recipeDelete"){ const r = S.recipes.find(x=>x.id===rOpen.id); if(r && confirm(L("„"+r.title+"“ aus der Rezeptdatenbank löschen?","Delete “"+r.title+"” from the recipe database?"))) save(()=>db.doc("recipes/"+r.id).delete(), L("Rezept gelöscht","Recipe deleted")).then(ok=>{ if(ok) closeRecipe(); }); }
     else if(act==="lang"){ const v = b.dataset.v; if(v!==LANG) save(()=>db.doc("plan/settings").set(Object.assign({}, S.settings||{}, {language:v}))).then(ok=>{ if(ok) setLang(v); }); }
+    else if(act==="importReview") reviewImport(id, +b.dataset.i);
+    else if(act==="importRetry") window.SB.api("POST","/api/imports/"+encodeURIComponent(id)+"/retry").catch(e=>toast(e.message));
+    else if(act==="importRetryAll") S.imports.filter(i=>i.state==="error").forEach(i=>window.SB.api("POST","/api/imports/"+encodeURIComponent(i.id)+"/retry").catch(e=>toast(e.message)));
+    else if(act==="importDiscard"){ if(confirm(L("Dieses Foto und die erkannten Rezepte verwerfen?","Discard this photo and the recipes found?"))) window.SB.api("DELETE","/api/imports/"+encodeURIComponent(id)).catch(e=>toast(e.message)); }
     else if(act==="recipeTool"){ toolMode = b.dataset.mode || ""; $("recipeTool").innerHTML = ""; renderRecipes(); }
   });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if(rOpen) closeRecipe(); else if(openId) closeSheet(); } });
   $("rscrim").addEventListener("click", closeRecipe);
   document.addEventListener("submit", e=>{
     if(e.target.id==="toolForm"){ e.preventDefault(); runTool(); }
+    else if(e.target.id==="photoForm"){ e.preventDefault(); uploadPhotos(e.target); }
     else if(e.target.id==="recipeForm"){ e.preventDefault(); saveRecipeForm(e.target); }
     else if(e.target.id==="scheduleForm"){ e.preventDefault(); scheduleRecipe($("scheduleDate").value); }
     else if(e.target.id==="recipeSearchForm"){ e.preventDefault(); }
@@ -1115,7 +1223,7 @@ h2{font-size:1.15rem;font-weight:700}
     "Feste Regeln für jeden Plan: Rhythmus, Allergien, was ihr nicht esst.":"Fixed rules for every plan: rhythm, allergies, what you don’t eat.",
     "Lade …":"Loading …", "Speichern":"Save", "Abbrechen":"Cancel", "Bearbeiten":"Edit", "Einrichtung":"Setup",
     "Rezepte, Zutaten oder Tags suchen":"Search recipes, ingredients or tags", "Rezepte durchsuchen":"Search recipes",
-    "Neues Rezept":"New recipe", "Von Link importieren":"Import from link", "Text umwandeln":"Convert text", "Von KI erfinden lassen":"Let the AI invent one",
+    "Neues Rezept":"New recipe", "Von Link importieren":"Import from link", "Text umwandeln":"Convert text", "Von KI erfinden lassen":"Let the AI invent one", "Von Foto importieren":"Import from photo", "Foto-Import":"Photo import",
     "Eure Rezepte":"Your recipes", "Bereiche":"Sections", "Heute":"Today", "Einkauf":"Shopping", "Rezepte":"Recipes", "Vollbild":"Full screen",
     "Notizen":"Notes", "z. B. nächstes Mal mit Spaghettini":"e.g. try with thinner spaghetti next time", "Notiz zu diesem Gericht":"Note about this meal",
     "Keine Lust darauf?":"Not feeling this one?",
@@ -1159,7 +1267,7 @@ h2{font-size:1.15rem;font-weight:700}
       const user = await window.claude.use("user");
       if(user && user.can){ const w = await user.can("data.write"); if(w===false) readOnly = true; }
     }catch(e){}
-    ["meals","draft","history","notes","grocery","staples","freezer","ideas","recipes"].forEach(c=>{
+    ["meals","draft","history","notes","grocery","staples","freezer","ideas","recipes","imports"].forEach(c=>{
       db.collection(c).onSnapshot(snap=>{
         S[c] = snap.docs.map(d=>Object.assign({}, d.data(), {id:d.id, _col:c})); S.loaded[c] = true; render();
       }, err=>{ S.loaded[c] = true; render(); });

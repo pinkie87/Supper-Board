@@ -65,6 +65,7 @@ A recipe's rating is derived from all meals with a matching `recipeId`.
 | `grocery` | `{text, at}` – extras for the next shop |
 | `staples` | `{name, group, status, order}` – pantry, `status`: `have`, `low` or `unknown` |
 | `freezer` | `{name, forMeal, at}` – freezer contents |
+| `imports` | `{state, images, recipes, message, order, createdAt}` – photo import: `state` is `waiting`, `working`, `done` or `error`; `recipes` are the recipes found but not yet reviewed. The photos are stored in `uploads/`. |
 
 ### `plan` (four documents)
 

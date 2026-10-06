@@ -19,7 +19,7 @@ Based on [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-Boar
 - **Ratings and notes:** stars for each cook night, notes like "try with thinner spaghetti next time".
 - **Shopping:** a shared list for extras, pantry staples marked "have" or "low" (low items join the list automatically), a freezer list.
 - **Requests:** "more fish", "nothing elaborate the week of the 20th"; the next plan takes them into account.
-- **Recipe database:** add your own recipes, import them from a link (Chefkoch, REWE, Lecker …), let the AI convert pasted text or invent a new recipe. Any recipe can be scheduled for a specific day. Meals rated 4–5 stars are added to the database automatically.
+- **Recipe database:** add your own recipes, import them from a link (Chefkoch, REWE, Lecker …) or from **photos of a cookbook**, let the AI convert pasted text or invent a new recipe. Any recipe can be scheduled for a specific day. Meals rated 4–5 stars are added to the database automatically.
 - **Metric:** recipes in g, ml, tbsp, tsp and °C with oven mode; imported imperial recipes are converted (with AI).
 - **German or English:** switch the language in the board under "Feedback → Setup". It applies to the whole household, including notifications, shopping lists and new AI recipes.
 
@@ -56,7 +56,7 @@ flowchart LR
 
 - **Board** (`web/`): a web page that updates live whenever someone changes something. Can be added to the phone's home screen. No external fonts or scripts.
 - **Server** (`app/`): Python (FastAPI) with an SQLite database. No cloud account needed.
-- **AI** (optional): with `LLM_PROVIDER=claude`, requests, ratings, pantry and recipe titles go to the Anthropic API when planning. With `ollama`, everything stays on your network. With `none`, plans are built from your recipe database.
+- **AI** (optional): with `LLM_PROVIDER=claude`, requests, ratings, pantry and recipe titles go to the Anthropic API when planning. With `ollama` or `openai` (a local OpenAI-compatible server such as llama.cpp), everything stays on your network – the model can also run on your PC. With `none`, plans are built from your recipe database.
 - **REWE:** REWE has no public ordering API, so the board produces a ready-to-paste list; each item in the plan's groceries also links to a search in the REWE online shop. Other supermarkets can be set in `.env`.
 
 ### Installation on a Fedora server
@@ -179,7 +179,7 @@ Basiert auf [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-B
 - **Bewerten und Notizen:** Sterne für jeden Kochabend, Notizen wie „nächstes Mal mit Spaghettini“.
 - **Einkauf:** gemeinsame Liste für Zusätze, Grundvorrat mit „Da“/„Knapp“ (knapp kommt automatisch auf die Liste), Gefrierschrank-Liste.
 - **Wünsche:** „mehr Fisch“, „in der Woche vom 20. nichts Aufwendiges“ – der nächste Plan berücksichtigt das.
-- **Rezeptdatenbank:** eigene Rezepte anlegen, per Link importieren (Chefkoch, REWE, Lecker …), Text von der KI umwandeln lassen oder ein neues Rezept erfinden lassen. Jedes Rezept lässt sich direkt für einen Tag einplanen. Gut bewertete Gerichte (4–5 Sterne) aus den Plänen landen automatisch in der Datenbank.
+- **Rezeptdatenbank:** eigene Rezepte anlegen, per Link (Chefkoch, REWE, Lecker …) oder von **Fotos eines Kochbuchs** importieren, Text von der KI umwandeln lassen oder ein neues Rezept erfinden lassen. Jedes Rezept lässt sich direkt für einen Tag einplanen. Gut bewertete Gerichte (4–5 Sterne) aus den Plänen landen automatisch in der Datenbank.
 - **Metrisch:** Rezepte in g, ml, EL, TL und °C mit Heizart; englische Rezepte werden beim Import umgerechnet (mit KI).
 - **Deutsch oder Englisch:** Die Sprache lässt sich im Board unter „Feedback → Einrichtung“ umschalten. Sie gilt für den ganzen Haushalt, auch für Benachrichtigungen, Einkaufslisten und neue KI-Rezepte.
 
@@ -216,7 +216,7 @@ flowchart LR
 
 - **Board** (`web/`): eine Webseite, die sich live aktualisiert, sobald jemand etwas ändert. Lässt sich auf dem Handy zum Startbildschirm hinzufügen. Keine externen Schriften oder Skripte.
 - **Server** (`app/`): Python (FastAPI) mit SQLite-Datenbank. Kein Cloud-Konto nötig.
-- **KI** (optional): Mit `LLM_PROVIDER=claude` gehen beim Planen Wünsche, Bewertungen, Vorrat und Rezepttitel an die Anthropic-API. Mit `ollama` bleibt alles im Heimnetz. Mit `none` werden Pläne aus eurer Rezeptdatenbank zusammengestellt.
+- **KI** (optional): Mit `LLM_PROVIDER=claude` gehen beim Planen Wünsche, Bewertungen, Vorrat und Rezepttitel an die Anthropic-API. Mit `ollama` oder `openai` (lokaler OpenAI-kompatibler Server wie llama.cpp) bleibt alles im Heimnetz – das Modell kann auch auf deinem PC laufen. Mit `none` werden Pläne aus eurer Rezeptdatenbank zusammengestellt.
 - **REWE:** REWE hat keine öffentliche Schnittstelle zum Bestellen. Das Board erstellt daher eine fertige Liste zum Kopieren; jeder Artikel im Plan-Einkauf ist außerdem ein Link auf die Suche im REWE-Shop. Andere Supermärkte lassen sich in der `.env` eintragen.
 
 ### Installation auf einem Fedora-Server
