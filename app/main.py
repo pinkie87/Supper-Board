@@ -14,10 +14,11 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from . import i18n, llm, notify, photos, planner, recipes, scheduler
+from . import i18n, llm, notify, photos, planner, recipes, scheduler, textparse
 from .config import Settings, settings as default_settings
 from .i18n import T
 from .seed import seed
+from .units import UnitOptions
 from .store import COLLECTIONS, NotFound, Store
 
 log = logging.getLogger("supper_board")
@@ -242,13 +243,26 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         recipe["source"] = url
         return recipe
 
-    @app.post("/api/recipes/from-text")
-    async def from_text(body: dict[str, str] = Body(...)):
-        llm_or_400()
-        text = (body.get("text") or "").strip()
+    def recipe_text(body: dict[str, Any]) -> str:
+        text = str(body.get("text") or "").strip()
         if len(text) < 20:
             raise HTTPException(400, T("Bitte den Rezepttext einfügen.", "Please paste the recipe text."))
-        recipe = await llm_call(planner.recipe_from_text(settings, text))
+        return text[:100_000]
+
+    @app.post("/api/recipes/parse-text")
+    async def parse_text(body: dict[str, Any] = Body(...)):
+        """Text ohne KI umwandeln – funktioniert auch, wenn der PC mit der KI aus ist."""
+        recipe = textparse.parse_text(recipe_text(body), UnitOptions.from_dict(body.get("units")))
+        if not recipe["ingredients"] and not recipe["steps"]:
+            raise HTTPException(400, T("Im Text wurden keine Zutaten oder Schritte gefunden.", "No ingredients or steps were found in the text."))
+        return recipe
+
+    @app.post("/api/recipes/from-text")
+    async def from_text(body: dict[str, Any] = Body(...)):
+        llm_or_400()
+        text = recipe_text(body)
+        units = UnitOptions.from_dict(body.get("units")) if body.get("units") else None
+        recipe = await llm_call(planner.recipe_from_text(settings, text, units))
         recipe["source"] = T("Text (KI)", "Text (AI)")
         return recipe
 

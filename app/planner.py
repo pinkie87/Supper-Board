@@ -16,6 +16,7 @@ from .config import Settings
 from . import i18n
 from .i18n import T
 from .recipes import RECIPE_SCHEMA, clean_recipe
+from .units import UnitOptions
 from .store import Store
 
 log = logging.getLogger(__name__)
@@ -41,6 +42,7 @@ Regeln für jedes Rezept:
 - Temperaturen in °C. Ofenangaben mit Heizart, z. B. "200 °C Ober-/Unterhitze" oder "180 °C Umluft".
 - Sichere Kerntemperaturen nennen: Geflügel 74 °C, Hackfleisch 71 °C, Schwein 63 °C mit Ruhezeit, Fisch 63 °C.
 - Zutaten, die es in einem normalen deutschen Supermarkt ({store}) gibt, in üblichen Packungsgrößen.
+- Umgerechnete Mengen auf praxistaugliche Werte runden, z. B. 450 g statt 454 g, 350 ml statt 355 ml, 175 °C statt 177 °C.
 - Zeitangabe wie "35 Min." oder "1 Std. 10 Min."; Portionen als Zahl.
 - Schritte nummeriert gedacht, aber ohne Nummer im Text; kurze, klare Sätze.
 - Ein kurzer Tipp zur Aufbewahrung oder Variante.
@@ -533,8 +535,23 @@ async def finalize_list(store: Store, settings: Settings, force: bool = False) -
 
 # ---------- KI-Rezepte ----------
 
-async def recipe_from_text(settings: Settings, text: str) -> dict:
-    prompt = f"""Wandle den folgenden Text in ein sauberes Rezept um. Übernimm Zutaten und Schritte inhaltlich, rechne alle Mengen und Temperaturen in metrische Einheiten und °C um und übersetze bei Bedarf ins Deutsche. Erfinde nichts dazu; fehlende Angaben (z. B. Zeit) schätzt du nur, wenn sie sich aus dem Text ergeben, sonst leer lassen. Tags: 2–5 kurze Schlagworte (z. B. vegetarisch, schnell, Ofen, Pasta).
+def unit_rules(opts: UnitOptions | None) -> str:
+    """Einheiten-Wünsche aus dem Board als Anweisung für die KI."""
+    if opts is None:
+        return "Rechne alle Mengen und Temperaturen in metrische Einheiten und °C um."
+    rules = ["Temperaturen in °C."]
+    origin = ("amerikanische Maße (1 Pfund = 454 g, 1 Tasse = 240 ml)" if opts.origin == "us"
+              else "deutsche Maße (1 Pfund = 500 g, 1 Tasse = 250 ml)")
+    rules.append(f"Der Text verwendet {origin}.")
+    rules.append("Gewichte in g/kg umrechnen." if opts.weight == "metric" else "Gewichtsangaben unverändert lassen.")
+    rules.append("Tassen und Flüssigmaße in ml/l umrechnen; trockene Zutaten in Tassen möglichst in Gramm."
+                 if opts.volume == "metric" else "Tassen und Flüssigmaße unverändert lassen.")
+    rules.append("Löffelangaben als EL/TL schreiben." if opts.spoons == "spoons" else "Löffelangaben in ml umrechnen (EL = 15 ml, TL = 5 ml).")
+    return " ".join(rules)
+
+
+async def recipe_from_text(settings: Settings, text: str, opts: UnitOptions | None = None) -> dict:
+    prompt = f"""Wandle den folgenden Text in ein sauberes Rezept um. Übernimm Zutaten und Schritte inhaltlich und übersetze bei Bedarf in die Sprache des Haushalts. {unit_rules(opts)} Erfinde nichts dazu; fehlende Angaben (z. B. Zeit) schätzt du nur, wenn sie sich aus dem Text ergeben, sonst leer lassen. Tags: 2–5 kurze Schlagworte (z. B. vegetarisch, schnell, Ofen, Pasta).
 
 TEXT:
 {text[:40000]}"""
