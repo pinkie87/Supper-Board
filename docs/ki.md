@@ -80,6 +80,24 @@ So läuft der Import:
 
 Die Fotos liegen bis zum Speichern oder Verwerfen in `uploads/` im Datenverzeichnis des Servers. Tipps: eine Seite pro Foto, gerade von oben, gutes Licht, kein Blitz. Unleserliche Stellen markiert die KI mit `[?]`.
 
+## Text umwandeln – auch ohne KI
+
+Unter „Rezepte → Text umwandeln“ wird eingefügter Rezepttext zum Rezept, z. B. die Ausgabe einer Texterkennung oder einer KI im Browser.
+
+- **„Umwandeln“** braucht keine KI und funktioniert auch, wenn der PC aus ist. Es erkennt Titel, Angaben wie Vorbereitungs- und Backzeit oder Portionen, die Abschnitte „Zutaten“ und „Zubereitung“ (auch Unterabschnitte wie „Soße“) und die Ofentemperatur. Am besten klappt es mit gegliedertem Text, etwa mit Markdown-Überschriften.
+- **„Mit KI umwandeln“** (nur mit eingerichteter KI) kommt auch mit ungeordnetem Text zurecht und rechnet trockene Zutaten in Tassen in Gramm um.
+
+Einstellungen für die Umrechnung (merkt sich das Board pro Gerät):
+
+| Schalter | Möglichkeiten |
+|---|---|
+| Maße im Text | amerikanisch (Pfund 454 g, Tasse 240 ml) oder deutsch (Pfund 500 g, Tasse 250 ml) |
+| Gewichte | in g/kg umrechnen oder so lassen |
+| Tassen & Flüssigmaße | in ml/l umrechnen oder so lassen |
+| Löffel | als EL/TL oder in ml |
+
+Umgerechnete Werte werden auf praxistaugliche Zahlen gerundet: 454 g → 450 g, 355 ml → 350 ml, 1,5 Tassen (deutsch) → 375 ml, 350 °F → 175 °C. Fahrenheit wird immer in °C umgerechnet, Zoll in cm.
+
 ## OpenAI-kompatibler Server (llama.cpp, LM Studio, vLLM, Unsloth-Modelle)
 
 Viele lokale Programme bieten dieselbe Schnittstelle wie OpenAI an: `llama-server` aus [llama.cpp](https://github.com/ggml-org/llama.cpp), LM Studio oder vLLM. Damit lassen sich z. B. die quantisierten GGUF-Modelle von [Unsloth](https://huggingface.co/unsloth) nutzen. (Viele Unsloth-GGUF-Modelle laufen auch direkt in Ollama: `ollama run hf.co/unsloth/<Modell>-GGUF`.)

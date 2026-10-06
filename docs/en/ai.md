@@ -80,6 +80,24 @@ How the import works:
 
 Photos stay in `uploads/` in the server's data directory until you save or discard them. Tips: one page per photo, straight from above, good light, no flash. The AI marks unreadable parts with `[?]`.
 
+## Convert text – also without AI
+
+Under "Recipes → Convert text", pasted recipe text becomes a recipe, e.g. the output of a text recognition tool or of an AI in your browser.
+
+- **"Convert"** needs no AI and also works when the PC is off. It detects the title, details such as prep and baking time or servings, the "Ingredients" and "Instructions" sections (including sub-sections such as "Sauce") and the oven temperature. It works best with structured text, e.g. with Markdown headings.
+- **"Convert with AI"** (only with an AI set up) also copes with unstructured text and converts dry ingredients given in cups to grams.
+
+Conversion settings (remembered per device):
+
+| Switch | Options |
+|---|---|
+| Measures in the text | American (pound 454 g, cup 240 ml) or German (pound 500 g, cup 250 ml) |
+| Weights | convert to g/kg or keep as is |
+| Cups & liquid measures | convert to ml/l or keep as is |
+| Spoons | as tbsp/tsp or in ml |
+
+Converted values are rounded to practical numbers: 454 g → 450 g, 355 ml → 350 ml, 1.5 cups (German) → 375 ml, 350 °F → 175 °C. Fahrenheit is always converted to °C, inches to cm.
+
 ## OpenAI-compatible server (llama.cpp, LM Studio, vLLM, Unsloth models)
 
 Many local tools offer the same API as OpenAI: `llama-server` from [llama.cpp](https://github.com/ggml-org/llama.cpp), LM Studio or vLLM. This lets you use e.g. the quantised GGUF models from [Unsloth](https://huggingface.co/unsloth). (Many Unsloth GGUF models also run directly in Ollama: `ollama run hf.co/unsloth/<model>-GGUF`.)

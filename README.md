@@ -20,7 +20,7 @@ Based on [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-Boar
 - **Shopping:** a shared list for extras, pantry staples marked "have" or "low" (low items join the list automatically), a freezer list.
 - **Requests:** "more fish", "nothing elaborate the week of the 20th"; the next plan takes them into account.
 - **Recipe database:** add your own recipes, import them from a link (Chefkoch, REWE, Lecker …) or from **photos of a cookbook**, let the AI convert pasted text or invent a new recipe. Any recipe can be scheduled for a specific day. Meals rated 4–5 stars are added to the database automatically.
-- **Metric:** recipes in g, ml, tbsp, tsp and °C with oven mode; imported imperial recipes are converted (with AI).
+- **Metric:** recipes in g, ml, tbsp, tsp and °C with oven mode. "Convert text" turns pasted recipe text into a recipe **without AI**, converts pounds, cups, ounces and °F (American or German measures, selectable) and rounds to practical values – 450 g instead of 454 g.
 - **German or English:** switch the language in the board under "Feedback → Setup". It applies to the whole household, including notifications, shopping lists and new AI recipes.
 
 **Automatically, on a schedule:**
@@ -180,7 +180,7 @@ Basiert auf [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-B
 - **Einkauf:** gemeinsame Liste für Zusätze, Grundvorrat mit „Da“/„Knapp“ (knapp kommt automatisch auf die Liste), Gefrierschrank-Liste.
 - **Wünsche:** „mehr Fisch“, „in der Woche vom 20. nichts Aufwendiges“ – der nächste Plan berücksichtigt das.
 - **Rezeptdatenbank:** eigene Rezepte anlegen, per Link (Chefkoch, REWE, Lecker …) oder von **Fotos eines Kochbuchs** importieren, Text von der KI umwandeln lassen oder ein neues Rezept erfinden lassen. Jedes Rezept lässt sich direkt für einen Tag einplanen. Gut bewertete Gerichte (4–5 Sterne) aus den Plänen landen automatisch in der Datenbank.
-- **Metrisch:** Rezepte in g, ml, EL, TL und °C mit Heizart; englische Rezepte werden beim Import umgerechnet (mit KI).
+- **Metrisch:** Rezepte in g, ml, EL, TL und °C mit Heizart. „Text umwandeln“ macht aus eingefügtem Rezepttext **ohne KI** ein Rezept, rechnet Pfund, Tassen, Unzen und °F um (amerikanische oder deutsche Maße, wählbar) und rundet auf praxistaugliche Werte – 450 g statt 454 g.
 - **Deutsch oder Englisch:** Die Sprache lässt sich im Board unter „Feedback → Einrichtung“ umschalten. Sie gilt für den ganzen Haushalt, auch für Benachrichtigungen, Einkaufslisten und neue KI-Rezepte.
 
 **Automatisch nach Zeitplan:**

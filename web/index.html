@@ -233,6 +233,8 @@ h2{font-size:1.15rem;font-weight:700}
 .rlist button:focus-visible{outline:2px solid var(--basil);outline-offset:-2px}
 .rlist .t{font-weight:700}
 .rlist .n{grid-column:1/-1;font-size:.85rem;color:var(--muted)}
+.field select{font:inherit;font-weight:400;color:var(--ink);border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;min-height:44px;width:100%}
+.units{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
 .check{display:flex;gap:8px;align-items:center;font-size:.92rem}
 .implist{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .imp{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:start;padding:12px 14px;border-top:1px solid var(--line)}
@@ -383,7 +385,7 @@ h2{font-size:1.15rem;font-weight:700}
       <div class="row-btns">
         <button type="button" class="btn small" data-act="recipeNew">Neues Rezept</button>
         <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="url">Von Link importieren</button>
-        <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="text">Text umwandeln</button>
+        <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="text">Text umwandeln</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="ai">Von KI erfinden lassen</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="photo">Von Foto importieren</button>
       </div>
@@ -880,6 +882,24 @@ h2{font-size:1.15rem;font-weight:700}
     if(!toolMode){ tool.innerHTML = ""; return; }
     if(tool.dataset.mode===toolMode && tool.innerHTML) { tool.querySelectorAll("button,input,textarea").forEach(el=>{ el.disabled = toolBusy; }); return; }
     tool.dataset.mode = toolMode;
+    if(toolMode==="text"){
+      const u = unitPrefs(), sel = (name, opts) => '<select name="'+name+'">'+opts.map(([v,t])=>'<option value="'+v+'"'+(u[name]===v?' selected':'')+'>'+t+'</option>').join("")+'</select>';
+      tool.innerHTML = '<form class="tool" id="toolForm" style="margin-top:10px" autocomplete="off">'+
+        '<label class="field">'+L("Rezepttext","Recipe text")+'<textarea id="toolInput" rows="10" placeholder="'+L('Rezept hier einfügen – z. B. die Textausgabe einer Texterkennung oder abgetippt','Paste a recipe here – e.g. the output of a text recognition tool, or typed up')+'" required></textarea></label>'+
+        '<div class="fields2 units">'+
+          '<label class="field">'+L('Maße im Text','Measures in the text')+sel("origin",[["us",L('Amerikanisch (Pfund 454 g, Tasse 240 ml)','American (pound 454 g, cup 240 ml)')],["de",L('Deutsch (Pfund 500 g, Tasse 250 ml)','German (pound 500 g, cup 250 ml)')]])+'</label>'+
+          '<label class="field">'+L('Gewichte','Weights')+sel("weight",[["metric",L('in g / kg','to g / kg')],["keep",L('so lassen','keep as is')]])+'</label>'+
+          '<label class="field">'+L('Tassen & Flüssigmaße','Cups & liquid measures')+sel("volume",[["metric",L('in ml / l','to ml / l')],["keep",L('so lassen','keep as is')]])+'</label>'+
+          '<label class="field">'+L('Löffel','Spoons')+sel("spoons",[["spoons",L('als EL / TL','as tbsp / tsp')],["ml",L('in ml','to ml')]])+'</label>'+
+        '</div>'+
+        '<p class="muted" style="margin:0;font-size:.88rem">'+L('„Umwandeln“ braucht keine KI: Es erkennt Titel, Angaben wie Backzeit und Portionen, Zutaten und Zubereitung und rundet umgerechnete Mengen (450 g statt 454 g). Am besten klappt es mit gegliedertem Text, z. B. mit Überschriften „Zutaten“ und „Zubereitung“.','“Convert” needs no AI: it detects the title, details such as baking time and servings, ingredients and steps, and rounds converted amounts (450 g instead of 454 g). Works best with structured text, e.g. with “Ingredients” and “Instructions” headings.')+
+          (ai?' '+L('„Mit KI umwandeln“ kommt auch mit ungeordnetem Text zurecht und rechnet trockene Zutaten in Gramm um.','“Convert with AI” also copes with unstructured text and converts dry ingredients to grams.'):'')+'</p>'+
+        '<div class="row-btns"><button class="btn small" type="submit" value="plain">'+L('Umwandeln','Convert')+'</button>'+
+          (ai?'<button class="btn small ghost" type="submit" value="ai">'+L('Mit KI umwandeln','Convert with AI')+'</button>':'')+
+          '<button class="btn small ghost" type="button" data-act="recipeTool" data-mode="">'+L('Abbrechen','Cancel')+'</button></div></form>';
+      setTimeout(()=>{ const i = $("toolInput"); if(i) i.focus(); }, 30);
+      return;
+    }
     if(toolMode==="photo"){
       tool.innerHTML = '<form class="tool" id="photoForm" style="margin-top:10px" autocomplete="off">'+
         '<label class="field">'+L('Fotos von Rezeptseiten','Photos of recipe pages')+'<input id="photoInput" type="file" accept="image/*" multiple required></label>'+
@@ -891,7 +911,6 @@ h2{font-size:1.15rem;font-weight:700}
     }
     const spec = {
       url: {label:L("Link zum Rezept","Recipe link"), input:'<input id="toolInput" type="url" placeholder="https://www.chefkoch.de/rezepte/…" required>', btn:L("Importieren","Import"), hint:L("Funktioniert mit den meisten Rezeptseiten (Chefkoch, REWE, Lecker, Kitchen Stories …).","Works with most recipe sites (Chefkoch, REWE, BBC Good Food, Kitchen Stories …).")+(ai?L(" Englische Rezepte werden ins Metrische umgerechnet."," Imperial units are converted to metric."):"")},
-      text: {label:L("Rezepttext","Recipe text"), input:'<textarea id="toolInput" rows="8" placeholder="'+L('Rezept hier einfügen – abgetippt, aus einer Nachricht oder einem Dokument','Paste a recipe here – typed up, from a message or a document')+'" required></textarea>', btn:L("Umwandeln","Convert"), hint:L("Die KI macht daraus ein sauberes Rezept mit metrischen Einheiten.","The AI turns it into a clean recipe with metric units.")},
       ai: {label:L("Was soll es sein?","What would you like?"), input:'<input id="toolInput" type="text" placeholder="'+L('z. B. vegetarisches Ofengericht mit Kürbis, 30 Minuten','e.g. vegetarian traybake with squash, 30 minutes')+'" required>', btn:L("Rezept erfinden","Create recipe"), hint:L("Die KI berücksichtigt eure Ernährungsrichtlinien.","The AI follows your dietary guidelines.")}
     }[toolMode];
     tool.innerHTML = '<form class="tool" id="toolForm" style="margin-top:10px" autocomplete="off"><label class="field">'+spec.label+spec.input+'</label><p class="muted" style="margin:0;font-size:.88rem">'+spec.hint+'</p>'+
@@ -974,11 +993,27 @@ h2{font-size:1.15rem;font-weight:700}
       else await window.SB.api("DELETE", "/api/imports/"+encodeURIComponent(ref.id));
     }catch(e){ toast(e.message); }
   }
-  async function runTool(){
+  // Einheiten-Wünsche für „Text umwandeln“, pro Gerät gemerkt
+  function unitPrefs(){
+    let u = {};
+    try{ u = JSON.parse(localStorage.getItem("sb-units")||"{}") || {}; }catch(e){}
+    return Object.assign({origin:"us", weight:"metric", volume:"metric", spoons:"spoons"}, u);
+  }
+  function readUnitPrefs(form){
+    const f = new FormData(form), u = {origin:f.get("origin"), weight:f.get("weight"), volume:f.get("volume"), spoons:f.get("spoons")};
+    try{ localStorage.setItem("sb-units", JSON.stringify(u)); }catch(e){}
+    return u;
+  }
+  async function runTool(submitter){
     const val = ($("toolInput").value||"").trim(); if(!val || toolBusy) return;
-    const ep = {url:["/api/recipes/import-url",{url:val}], text:["/api/recipes/from-text",{text:val}], ai:["/api/recipes/generate",{wish:val}]}[toolMode];
+    const viaAi = toolMode==="text" && submitter && submitter.value==="ai";
+    const units = toolMode==="text" ? readUnitPrefs($("toolForm")) : null;
+    const ep = toolMode==="text"
+      ? (viaAi ? ["/api/recipes/from-text",{text:val, units}] : ["/api/recipes/parse-text",{text:val, units}])
+      : {url:["/api/recipes/import-url",{url:val}], ai:["/api/recipes/generate",{wish:val}]}[toolMode];
     toolBusy = true; renderRecipes();
-    toast(toolMode==="url" ? L("Lade das Rezept …","Loading the recipe …") : (aiName()||L("Die KI","The AI"))+L(" schreibt das Rezept …"," is writing the recipe …"));
+    if(toolMode==="url") toast(L("Lade das Rezept …","Loading the recipe …"));
+    else if(toolMode==="ai" || viaAi) toast((aiName()||L("Die KI","The AI"))+L(" schreibt das Rezept …"," is writing the recipe …"));
     try{
       const r = await window.SB.api("POST", ep[0], ep[1]);
       toolMode = ""; $("recipeTool").innerHTML = "";
@@ -1164,7 +1199,7 @@ h2{font-size:1.15rem;font-weight:700}
   document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if(rOpen) closeRecipe(); else if(openId) closeSheet(); } });
   $("rscrim").addEventListener("click", closeRecipe);
   document.addEventListener("submit", e=>{
-    if(e.target.id==="toolForm"){ e.preventDefault(); runTool(); }
+    if(e.target.id==="toolForm"){ e.preventDefault(); runTool(e.submitter); }
     else if(e.target.id==="photoForm"){ e.preventDefault(); uploadPhotos(e.target); }
     else if(e.target.id==="recipeForm"){ e.preventDefault(); saveRecipeForm(e.target); }
     else if(e.target.id==="scheduleForm"){ e.preventDefault(); scheduleRecipe($("scheduleDate").value); }
