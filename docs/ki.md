@@ -8,7 +8,7 @@ Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt ei
 |---|---|---|
 | `claude` | Claude über die Anthropic-API. Beste Rezeptqualität. | Beim Planen gehen Richtlinien, Bewertungen, Notizen, Wünsche, Vorrat, Gefrierschrank und die Titel eurer Rezepte an Anthropic. Alles andere bleibt auf dem Server. |
 | `ollama` | Lokales Modell über [Ollama](https://ollama.com), auf dem Server oder deinem PC. | Nichts verlässt das Heimnetz. |
-| `openai` | Lokaler OpenAI-kompatibler Server, z. B. llama.cpp oder LM Studio (auch mit Unsloth-Modellen). | Nichts verlässt das Heimnetz. |
+| `openai` | OpenAI-kompatible Schnittstelle: lokal (llama.cpp, LM Studio, auch mit Unsloth-Modellen) oder in der Cloud (Google Gemini, OpenRouter – mit kostenlosem Kontingent). | Lokal: nichts verlässt das Heimnetz. Cloud: wie bei Claude, siehe unten. |
 | `none` | Keine KI. Pläne werden aus der Rezeptdatenbank zusammengestellt (gut bewertete zuerst, mit Abwechslung). | Nichts verlässt den Server. |
 
 Ohne KI funktioniert alles andere weiter: Rezepte per Formular oder Link anlegen, Plan aus der Datenbank, Einkaufsliste, Erinnerungen.
@@ -121,6 +121,45 @@ OPENAI_API_KEY=
 ```
 
 Das Board fordert die Antwort als JSON nach Schema an; kennt ein Server das nicht, fragt es ohne Schema noch einmal nach.
+
+## Google Gemini oder OpenRouter (Cloud, kostenloses Kontingent)
+
+Beide bieten eine OpenAI-kompatible Schnittstelle und kostenlose Modelle an. Sie laufen über `LLM_PROVIDER=openai`; das Board erkennt den Anbieter an der Adresse und zeigt seinen Namen an. Dein PC muss dafür nicht laufen.
+
+**Google Gemini**
+
+1. In [Google AI Studio](https://aistudio.google.com/) mit einem Google-Konto anmelden und einen API-Schlüssel erstellen.
+2. In der `.env`:
+
+   ```ini
+   LLM_PROVIDER=openai
+   OPENAI_URL=https://generativelanguage.googleapis.com/v1beta/openai
+   OPENAI_API_KEY=<dein Schlüssel>
+   OPENAI_MODEL=gemini-2.5-flash
+   ```
+
+   Gemini-Modelle verstehen auch Fotos, `OPENAI_VISION_MODEL` kann leer bleiben. Die aktuellen Modellnamen stehen in AI Studio.
+
+**OpenRouter**
+
+1. Auf [openrouter.ai](https://openrouter.ai/) ein Konto anlegen und unter „Keys“ einen API-Schlüssel erstellen.
+2. Ein kostenloses Modell aussuchen: In der [Modellliste](https://openrouter.ai/models) nach „free“ filtern – die Namen enden auf `:free`. Für den Foto-Import ein Modell mit Bild-Eingabe („image“) wählen.
+3. In der `.env`:
+
+   ```ini
+   LLM_PROVIDER=openai
+   OPENAI_URL=https://openrouter.ai/api/v1
+   OPENAI_API_KEY=sk-or-...
+   OPENAI_MODEL=<anbieter>/<modell>:free
+   # Falls das Textmodell keine Bilder versteht:
+   OPENAI_VISION_MODEL=<anbieter>/<bildmodell>:free
+   ```
+
+   Manche kostenlosen Modelle sind nur nutzbar, wenn in den OpenRouter-Einstellungen unter „Privacy“ die entsprechenden Anbieter erlaubt sind.
+
+**Grenzen der kostenlosen Kontingente:** Es gibt Limits pro Minute und pro Tag; wie hoch, legen die Anbieter fest und ändern es gelegentlich. Meldet der Anbieter „zu viele Anfragen“, pausiert der Foto-Import und macht automatisch weiter (Wartezeit wächst bis höchstens eine Stunde) – ein ganzes Buch dauert so eventuell mehrere Tage, läuft aber ohne dein Zutun. „Erneut versuchen“ startet sofort einen neuen Versuch. Der Planentwurf braucht nur eine Anfrage pro Woche.
+
+**Datenschutz:** Bei kostenlosen Angeboten können Anbieter die gesendeten Daten zur Verbesserung ihrer Modelle verwenden. Gesendet werden beim Planen Richtlinien, Bewertungen, Notizen, Wünsche, Vorrat, Gefrierschrank und Rezepttitel, beim Foto-Import die Fotos. Wer das nicht möchte, nimmt Ollama auf dem eigenen PC.
 
 ## Wenn der PC nicht läuft
 

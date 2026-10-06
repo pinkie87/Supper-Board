@@ -8,7 +8,7 @@ The AI writes new meal plans, replaces meals you reject, converts pasted recipe 
 |---|---|---|
 | `claude` | Claude via the Anthropic API. Best recipe quality. | When planning, guidelines, ratings, notes, requests, pantry, freezer and your recipe titles go to Anthropic. Everything else stays on the server. |
 | `ollama` | A local model via [Ollama](https://ollama.com), on the server or your PC. | Nothing leaves your home network. |
-| `openai` | A local OpenAI-compatible server, e.g. llama.cpp or LM Studio (also with Unsloth models). | Nothing leaves your home network. |
+| `openai` | OpenAI-compatible API: local (llama.cpp, LM Studio, also with Unsloth models) or in the cloud (Google Gemini, OpenRouter – with a free tier). | Local: nothing leaves your home network. Cloud: as with Claude, see below. |
 | `none` | No AI. Plans are built from the recipe database (best-rated first, with variety). | Nothing leaves the server. |
 
 Without AI everything else keeps working: adding recipes by form or link, plans from the database, shopping list, reminders.
@@ -121,6 +121,45 @@ OPENAI_API_KEY=
 ```
 
 The board asks for JSON following a schema; if a server doesn't support that, it asks again without the schema.
+
+## Google Gemini or OpenRouter (cloud, free tier)
+
+Both offer an OpenAI-compatible API and free models. They run via `LLM_PROVIDER=openai`; the board recognises the provider from the address and shows its name. Your PC doesn't need to be on.
+
+**Google Gemini**
+
+1. Sign in to [Google AI Studio](https://aistudio.google.com/) with a Google account and create an API key.
+2. In `.env`:
+
+   ```ini
+   LLM_PROVIDER=openai
+   OPENAI_URL=https://generativelanguage.googleapis.com/v1beta/openai
+   OPENAI_API_KEY=<your key>
+   OPENAI_MODEL=gemini-2.5-flash
+   ```
+
+   Gemini models also understand photos, so `OPENAI_VISION_MODEL` can stay empty. Current model names are listed in AI Studio.
+
+**OpenRouter**
+
+1. Create an account on [openrouter.ai](https://openrouter.ai/) and create an API key under "Keys".
+2. Pick a free model: filter the [model list](https://openrouter.ai/models) for "free" – the names end in `:free`. For the photo import, choose a model with image input ("image").
+3. In `.env`:
+
+   ```ini
+   LLM_PROVIDER=openai
+   OPENAI_URL=https://openrouter.ai/api/v1
+   OPENAI_API_KEY=sk-or-...
+   OPENAI_MODEL=<provider>/<model>:free
+   # If the text model doesn't understand images:
+   OPENAI_VISION_MODEL=<provider>/<vision-model>:free
+   ```
+
+   Some free models can only be used if the corresponding providers are allowed under "Privacy" in your OpenRouter settings.
+
+**Free tier limits:** there are limits per minute and per day; the providers set them and change them now and then. If the provider reports "too many requests", the photo import pauses and continues automatically (the wait grows up to one hour) – a whole book may take several days this way, but runs without you. "Try again" starts a new attempt right away. The plan draft only needs one request per week.
+
+**Privacy:** with free offers, providers may use the data you send to improve their models. When planning, guidelines, ratings, notes, requests, pantry, freezer and recipe titles are sent; for the photo import, the photos. If you don't want that, use Ollama on your own PC.
 
 ## When the PC is off
 

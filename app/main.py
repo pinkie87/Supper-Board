@@ -99,7 +99,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         return {
             "storeName": settings.store_name, "storeUrl": settings.store_url, "storeSearchUrl": settings.store_search_url,
             "llm": settings.llm_provider if settings.llm_enabled else "none",
-            "llmLabel": {"claude": "Claude", "ollama": "Ollama", "openai": T("Lokale KI", "Local AI")}.get(settings.llm_provider, ""),
+            "llmLabel": llm.provider_label(settings),
             "notify": notify.enabled(settings),
             "draftDay": planner.wd_long(settings.draft_weekday), "listDay": planner.wd_long(settings.list_weekday),
             "shopDay": planner.wd_long(settings.shop_weekday),
@@ -294,7 +294,9 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     async def retry_import(doc_id: str):
         if not store.get("imports", doc_id):
             raise HTTPException(404, T("Nicht gefunden", "Not found"))
-        store.update("imports", doc_id, {"state": "waiting", "message": {"__delete__": True}})
+        store.update("imports", doc_id, {"state": "waiting", "message": {"__delete__": True},
+                                         "retryAt": {"__delete__": True}, "attempts": {"__delete__": True}})
+        photo_worker.pause_until = 0
         photo_worker.wake.set()
         return {"ok": True}
 

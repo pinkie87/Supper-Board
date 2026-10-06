@@ -56,7 +56,7 @@ flowchart LR
 
 - **Board** (`web/`): a web page that updates live whenever someone changes something. Can be added to the phone's home screen. No external fonts or scripts.
 - **Server** (`app/`): Python (FastAPI) with an SQLite database. No cloud account needed.
-- **AI** (optional): with `LLM_PROVIDER=claude`, requests, ratings, pantry and recipe titles go to the Anthropic API when planning. With `ollama` or `openai` (a local OpenAI-compatible server such as llama.cpp), everything stays on your network – the model can also run on your PC. With `none`, plans are built from your recipe database.
+- **AI** (optional): with `LLM_PROVIDER=claude`, requests, ratings, pantry and recipe titles go to the Anthropic API when planning. With `ollama` or `openai` (a local OpenAI-compatible server such as llama.cpp), everything stays on your network – the model can also run on your PC. `openai` also works with **Google Gemini** and **OpenRouter**, both of which offer free models. With `none`, plans are built from your recipe database.
 - **REWE:** REWE has no public ordering API, so the board produces a ready-to-paste list; each item in the plan's groceries also links to a search in the REWE online shop. Other supermarkets can be set in `.env`.
 
 ### Installation on a Fedora server
@@ -216,7 +216,7 @@ flowchart LR
 
 - **Board** (`web/`): eine Webseite, die sich live aktualisiert, sobald jemand etwas ändert. Lässt sich auf dem Handy zum Startbildschirm hinzufügen. Keine externen Schriften oder Skripte.
 - **Server** (`app/`): Python (FastAPI) mit SQLite-Datenbank. Kein Cloud-Konto nötig.
-- **KI** (optional): Mit `LLM_PROVIDER=claude` gehen beim Planen Wünsche, Bewertungen, Vorrat und Rezepttitel an die Anthropic-API. Mit `ollama` oder `openai` (lokaler OpenAI-kompatibler Server wie llama.cpp) bleibt alles im Heimnetz – das Modell kann auch auf deinem PC laufen. Mit `none` werden Pläne aus eurer Rezeptdatenbank zusammengestellt.
+- **KI** (optional): Mit `LLM_PROVIDER=claude` gehen beim Planen Wünsche, Bewertungen, Vorrat und Rezepttitel an die Anthropic-API. Mit `ollama` oder `openai` (lokaler OpenAI-kompatibler Server wie llama.cpp) bleibt alles im Heimnetz – das Modell kann auch auf deinem PC laufen. `openai` funktioniert auch mit **Google Gemini** und **OpenRouter**, die beide kostenlose Modelle anbieten. Mit `none` werden Pläne aus eurer Rezeptdatenbank zusammengestellt.
 - **REWE:** REWE hat keine öffentliche Schnittstelle zum Bestellen. Das Board erstellt daher eine fertige Liste zum Kopieren; jeder Artikel im Plan-Einkauf ist außerdem ein Link auf die Suche im REWE-Shop. Andere Supermärkte lassen sich in der `.env` eintragen.
 
 ### Installation auf einem Fedora-Server

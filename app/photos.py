@@ -11,6 +11,7 @@ import base64
 import binascii
 import logging
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -141,6 +142,18 @@ async def read_photos(store: Store, settings: Settings, doc_id: str) -> None:
     store.update("imports", doc_id, {"state": "working", "message": {"__delete__": True}})
     try:
         data = await llm.generate_json(settings, system_prompt(settings), _prompt(len(images)), PHOTO_SCHEMA, images=images)
+    except llm.LLMRateLimited as e:
+        # Limit des Anbieters (z. B. kostenloses Kontingent): später automatisch weiter,
+        # mit wachsender Wartezeit bis höchstens eine Stunde
+        if store.get("imports", doc_id):
+            attempts = (doc.get("attempts") or 0) + 1
+            retry_at = time.time() + max(e.retry_after, min(3600, 60 * 2 ** (attempts - 1)))
+            when = datetime.fromtimestamp(retry_at, settings.timezone).strftime("%H:%M")
+            store.update("imports", doc_id, {
+                "state": "waiting", "attempts": attempts, "retryAt": retry_at,
+                "message": T(f"{e} Neuer Versuch automatisch um {when}.", f"{e} Retrying automatically at {when}."),
+            })
+        raise
     except llm.LLMError as e:
         if store.get("imports", doc_id):
             store.update("imports", doc_id, {"state": "error", "message": str(e)})
@@ -152,7 +165,8 @@ async def read_photos(store: Store, settings: Settings, doc_id: str) -> None:
             recipe["source"] = T("Foto", "Photo")
             found.append(recipe)
     if store.get("imports", doc_id):  # kann inzwischen verworfen worden sein
-        store.update("imports", doc_id, {"state": "done", "recipes": found})
+        store.update("imports", doc_id, {"state": "done", "recipes": found, "attempts": {"__delete__": True},
+                                         "retryAt": {"__delete__": True}, "message": {"__delete__": True}})
 
 
 class PhotoWorker:
@@ -161,25 +175,39 @@ class PhotoWorker:
     def __init__(self, store: Store, settings: Settings):
         self.store, self.settings = store, settings
         self.wake = asyncio.Event()
+        self.pause_until = 0.0  # nach einem Limit des Anbieters die ganze Warteschlange anhalten
 
     async def run(self) -> None:
         for doc in self.store.list("imports"):
             if doc.get("state") == "working":  # beim Neustart unterbrochen
                 self.store.update("imports", doc["id"], {"state": "waiting"})
         while True:
+            now = time.time()
             waiting = sorted((d for d in self.store.list("imports") if d.get("state") == "waiting"),
                              key=lambda d: d.get("order") or d.get("createdAt", ""))
             if not waiting or not self.settings.llm_enabled:
                 self.wake.clear()
                 await self.wake.wait()
                 continue
+            ready = [d for d in waiting if (d.get("retryAt") or 0) <= now] if now >= self.pause_until else []
+            if not ready:
+                next_at = max(self.pause_until, min(d.get("retryAt") or 0 for d in waiting))
+                self.wake.clear()
+                try:
+                    await asyncio.wait_for(self.wake.wait(), timeout=max(1.0, next_at - now))
+                except asyncio.TimeoutError:
+                    pass
+                continue
             i18n.use_household(self.store)
             try:
-                await read_photos(self.store, self.settings, waiting[0]["id"])
+                await read_photos(self.store, self.settings, ready[0]["id"])
+            except llm.LLMRateLimited:
+                doc = self.store.get("imports", ready[0]["id"]) or {}
+                self.pause_until = doc.get("retryAt") or time.time() + 60
             except Exception:  # noqa: BLE001 – ein kaputtes Foto darf den Worker nicht anhalten
-                log.exception("Foto-Import %s fehlgeschlagen", waiting[0]["id"])
-                if self.store.get("imports", waiting[0]["id"]):
-                    self.store.update("imports", waiting[0]["id"], {
+                log.exception("Foto-Import %s fehlgeschlagen", ready[0]["id"])
+                if self.store.get("imports", ready[0]["id"]):
+                    self.store.update("imports", ready[0]["id"], {
                         "state": "error",
                         "message": T("Unerwarteter Fehler, Details stehen im Server-Log.", "Unexpected error, see the server log for details."),
                     })

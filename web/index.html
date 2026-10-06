@@ -932,13 +932,13 @@ h2{font-size:1.15rem;font-weight:700}
         const n = (i.images||[]).length, recs = i.recipes||[];
         const pages = n>1 ? L(n+' Fotos',n+' photos')+' · ' : '';
         let body;
-        if(i.state==="waiting") body = '<span class="muted">'+pages+L('Wartet …','Waiting …')+'</span>';
+        if(i.state==="waiting") body = '<span class="muted">'+pages+(i.message?esc(i.message):L('Wartet …','Waiting …'))+'</span>';
         else if(i.state==="working") body = '<span>'+pages+'<b>'+L('Wird gelesen …','Reading …')+'</b></span>';
         else if(i.state==="error") body = '<span class="muted">'+pages+L('Fehler: ','Error: ')+esc(i.message||"")+'</span>';
         else if(recs.length) body = '<span>'+pages+L(recs.length+' Rezept'+(recs.length>1?'e':'')+' gefunden',recs.length+' recipe'+(recs.length>1?'s':'')+' found')+'</span><div class="row-btns">'+
           recs.map((r,k)=>'<button type="button" class="btn small" data-act="importReview" data-id="'+esc(i.id)+'" data-i="'+k+'">'+L('Prüfen: ','Review: ')+esc(r.title)+'</button>').join("")+'</div>';
         else body = '<span class="muted">'+pages+L('Kein Rezept erkannt.','No recipe found.')+'</span>';
-        const acts = (i.state==="error"||(i.state==="done"&&!recs.length)?'<button type="button" class="btn small ghost" data-act="importRetry" data-id="'+esc(i.id)+'">'+L('Erneut versuchen','Try again')+'</button>':'')+
+        const acts = (i.state==="error"||(i.state==="done"&&!recs.length)||(i.state==="waiting"&&i.retryAt)?'<button type="button" class="btn small ghost" data-act="importRetry" data-id="'+esc(i.id)+'">'+L('Erneut versuchen','Try again')+'</button>':'')+
           (i.state!=="working"?'<button type="button" class="btn small ghost" data-act="importDiscard" data-id="'+esc(i.id)+'">'+L('Verwerfen','Discard')+'</button>':'');
         return '<div class="imp">'+img+'<div class="what">'+body+(acts?'<div class="row-btns">'+acts+'</div>':'')+'</div></div>';
       }).join("")+'</div>';
