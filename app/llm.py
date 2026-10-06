@@ -31,6 +31,41 @@ class LLMUnavailable(LLMError):
     pass
 
 
+class LLMRateLimited(LLMError):
+    """Anbieter meldet zu viele Anfragen (z. B. kostenloses Kontingent). retry_after in Sekunden."""
+
+    def __init__(self, message: str, retry_after: int = 60):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def provider_label(settings: Settings) -> str:
+    """Name des KI-Anbieters für Board und Meldungen."""
+    if settings.llm_provider == "claude":
+        return "Claude"
+    if settings.llm_provider == "ollama":
+        return "Ollama"
+    if settings.llm_provider == "openai":
+        url = settings.openai_url.lower()
+        if "openrouter.ai" in url:
+            return "OpenRouter"
+        if "generativelanguage.googleapis.com" in url:
+            return "Gemini"
+        return T("Lokale KI", "Local AI")
+    return ""
+
+
+def is_cloud(settings: Settings) -> bool:
+    return settings.llm_provider == "claude" or provider_label(settings) in ("OpenRouter", "Gemini")
+
+
+def _retry_after(response: httpx.Response) -> int:
+    try:
+        return max(5, min(3600, int(float(response.headers.get("retry-after", "60")))))
+    except ValueError:
+        return 60
+
+
 # Ein Bild: (MIME-Typ, Base64-Daten ohne "data:"-Präfix)
 Image = tuple[str, str]
 
@@ -95,7 +130,8 @@ async def _claude(settings: Settings, system: str, prompt: str, schema: dict[str
     except anthropic.AuthenticationError as e:
         raise LLMError(T("Claude: API-Schlüssel ungültig.", "Claude: invalid API key.")) from e
     except anthropic.RateLimitError as e:
-        raise LLMError(T("Claude: Ratenlimit erreicht, bitte später erneut versuchen.", "Claude: rate limit reached, please try again later.")) from e
+        raise LLMRateLimited(T("Claude: Ratenlimit erreicht, bitte später erneut versuchen.", "Claude: rate limit reached, please try again later."),
+                             _retry_after(e.response)) from e
     except anthropic.APIStatusError as e:
         raise LLMError(T(f"Claude: Fehler {e.status_code}: {e.message}", f"Claude: error {e.status_code}: {e.message}")) from e
     except anthropic.APIConnectionError as e:
@@ -141,7 +177,8 @@ async def _ollama(settings: Settings, system: str, prompt: str, schema: dict[str
 
 
 async def _openai(settings: Settings, system: str, prompt: str, schema: dict[str, Any], images: list[Image]) -> dict:
-    """OpenAI-kompatible Chat-Schnittstelle, wie sie llama.cpp, LM Studio und vLLM anbieten."""
+    """OpenAI-kompatible Chat-Schnittstelle: lokal (llama.cpp, LM Studio, vLLM) oder in der Cloud
+    (Google Gemini, OpenRouter)."""
     model = settings.openai_model
     content: list[dict] | str = prompt + "\n\nAntworte ausschließlich mit JSON nach dem vorgegebenen Schema."
     if images:
@@ -155,22 +192,32 @@ async def _openai(settings: Settings, system: str, prompt: str, schema: dict[str
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}],
         "response_format": {"type": "json_schema", "json_schema": {"name": "result", "schema": schema}},
     }
+    label = provider_label(settings)
     headers = {"Authorization": f"Bearer {settings.openai_api_key}"} if settings.openai_api_key else {}
+    if label == "OpenRouter":  # von OpenRouter empfohlen, damit die App zugeordnet werden kann
+        headers.update({"HTTP-Referer": settings.public_url or "https://github.com/pinkie87/Supper-Board", "X-Title": "Supper Board"})
     url = f"{settings.openai_url}/chat/completions"
     try:
         async with httpx.AsyncClient(timeout=LOCAL_TIMEOUT, headers=headers) as client:
             r = await client.post(url, json=body)
-            if r.status_code == 400 and "response_format" in r.text:
-                # Manche Server kennen kein JSON-Schema – dann nur per Anweisung
+            if r.status_code in (400, 422):
+                # Manche Server bzw. Modelle kennen kein JSON-Schema – dann nur per Anweisung
                 body.pop("response_format")
                 r = await client.post(url, json=body)
     except httpx.HTTPError as e:
+        if is_cloud(settings):
+            raise LLMError(T(f"Keine Verbindung zu {label} ({settings.openai_url}).", f"Cannot reach {label} ({settings.openai_url}).")) from e
         raise LLMError(T(f"KI-Server nicht erreichbar unter {settings.openai_url}. Läuft der PC?",
                          f"Cannot reach the AI server at {settings.openai_url}. Is the PC switched on?")) from e
+    if r.status_code == 429:
+        raise LLMRateLimited(T(f"{label}: Limit erreicht (zu viele Anfragen oder Tageskontingent aufgebraucht).",
+                               f"{label}: limit reached (too many requests or daily quota used up)."), _retry_after(r))
+    if r.status_code in (401, 403):
+        raise LLMError(T(f"{label}: API-Schlüssel fehlt oder ist ungültig (OPENAI_API_KEY).", f"{label}: API key missing or invalid (OPENAI_API_KEY)."))
     if r.status_code != 200:
-        raise LLMError(T(f"KI-Server ({model}): Fehler {r.status_code}: {r.text[:200]}", f"AI server ({model}): error {r.status_code}: {r.text[:200]}"))
+        raise LLMError(T(f"{label} ({model}): Fehler {r.status_code}: {r.text[:200]}", f"{label} ({model}): error {r.status_code}: {r.text[:200]}"))
     try:
         text = r.json()["choices"][0]["message"]["content"]
         return parse_json(text)
     except (KeyError, IndexError, TypeError, json.JSONDecodeError, ValueError) as e:
-        raise LLMError(T("KI-Server: Antwort war kein gültiges JSON.", "AI server: the answer was not valid JSON.")) from e
+        raise LLMError(T(f"{label}: Antwort war kein gültiges JSON.", f"{label}: the answer was not valid JSON.")) from e

@@ -145,3 +145,63 @@ def test_unreachable_local_ai_gives_clear_error(settings, monkeypatch):
     monkeypatch.setattr(httpx.AsyncClient, "post", post)
     with pytest.raises(llm.LLMError, match="Läuft der PC"):
         asyncio.run(llm.generate_json(settings, "sys", "prompt", {}))
+
+
+def test_provider_labels(settings):
+    settings.llm_provider = "openai"
+    settings.openai_url = "https://openrouter.ai/api/v1"
+    assert llm.provider_label(settings) == "OpenRouter" and llm.is_cloud(settings)
+    settings.openai_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert llm.provider_label(settings) == "Gemini"
+    settings.openai_url = "http://192.168.178.20:8080/v1"
+    assert llm.provider_label(settings) == "Lokale KI" and not llm.is_cloud(settings)
+
+
+def test_openrouter_headers_and_rate_limit(settings, monkeypatch):
+    settings.llm_provider, settings.openai_url, settings.openai_api_key = "openai", "https://openrouter.ai/api/v1", "sk-or-test"
+    seen = {}
+
+    class FakeClient(httpx.AsyncClient):
+        def __init__(self, *a, headers=None, **kw):
+            seen["headers"] = dict(headers or {})
+            super().__init__(*a, **kw)
+
+        async def post(self, url, json=None, **kw):
+            seen["url"] = url
+            return httpx.Response(429, headers={"Retry-After": "120"}, text="rate limited")
+
+    monkeypatch.setattr(llm.httpx, "AsyncClient", FakeClient)
+    with pytest.raises(llm.LLMRateLimited) as err:
+        asyncio.run(llm.generate_json(settings, "sys", "prompt", {}))
+    assert err.value.retry_after == 120 and "OpenRouter: Limit erreicht" in str(err.value)
+    assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions"
+    assert seen["headers"]["Authorization"] == "Bearer sk-or-test" and seen["headers"]["X-Title"] == "Supper Board"
+
+
+def test_photo_import_pauses_on_rate_limit(settings, monkeypatch):
+    settings.llm_provider = "openai"
+    settings.openai_url = "https://generativelanguage.googleapis.com/v1beta/openai"
+    calls = []
+
+    async def limited(settings_, system, prompt, schema, images=None):
+        calls.append(1)
+        raise llm.LLMRateLimited("Gemini: Limit erreicht.", 30)
+
+    monkeypatch.setattr(llm, "generate_json", limited)
+    with TestClient(create_app(settings, run_scheduler=False)) as c:
+        first, second = c.post("/api/imports", json={"images": [PNG, PNG]}).json()["ids"]
+        assert wait_for(lambda: c.get(f"/api/db/imports/{first}").json().get("retryAt"))
+        doc = c.get(f"/api/db/imports/{first}").json()
+        assert doc["state"] == "waiting" and doc["attempts"] == 1 and "Neuer Versuch automatisch um" in doc["message"]
+        time.sleep(0.3)
+        assert len(calls) == 1  # Warteschlange pausiert, das zweite Foto wartet
+        assert c.get(f"/api/db/imports/{second}").json()["state"] == "waiting"
+
+        async def ok(settings_, system, prompt, schema, images=None):
+            return {"recipes": [RECIPE]}
+
+        monkeypatch.setattr(llm, "generate_json", ok)
+        assert c.post(f"/api/imports/{first}/retry").status_code == 200  # sofort erneut versuchen
+        assert wait_for(lambda: c.get(f"/api/db/imports/{first}").json().get("state") == "done")
+        done = c.get(f"/api/db/imports/{first}").json()
+        assert "retryAt" not in done and "attempts" not in done
