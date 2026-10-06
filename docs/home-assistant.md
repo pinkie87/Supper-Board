@@ -6,7 +6,7 @@ Supper Board schickt Benachrichtigungen über die `notify`-Dienste von Home Assi
 
 ## Benachrichtigungen
 
-**Was verschickt wird:**
+Die Nachrichten kommen in der Sprache des Boards (Deutsch oder Englisch). **Was verschickt wird:**
 
 | Wann | Nachricht |
 |---|---|

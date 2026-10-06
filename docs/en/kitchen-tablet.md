@@ -17,7 +17,7 @@ Echo Show or Nest Hub can't show a custom web page. E-ink screens aren't good fo
 
 ## Full screen and keeping the screen on
 
-On wide screens there's a **Vollbild** (full screen) button at the top right. It hides the browser bar and keeps the screen on. After standby you need to tap it again.
+On wide screens there's a **Full screen** button at the top right. It hides the browser bar and keeps the screen on. After standby you need to tap it again.
 
 ## Kiosk mode (Android / Fire)
 

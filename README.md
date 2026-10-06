@@ -6,7 +6,7 @@
 
 A shared dinner board for the household, self-hosted on your own server. It shows what's for dinner tonight, a two-week meal plan with recipes, when to thaw something and the next shopping list. If you like, an AI (Claude or a local model via Ollama) writes new plans and learns from your ratings. Reminders reach your phone through Home Assistant.
 
-Based on [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-Board) (MIT license). The original ran as a Claude artifact with Walmart pickup orders in the US. This version is set up for Germany: the interface and recipes are in German, units are metric, everything runs on your own server, and the shopping list targets REWE (or any other supermarket). Detailed guides are available in English (`docs/en/`) and German (`docs/`).
+Based on [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-Board) (MIT license). The original ran as a Claude artifact with Walmart pickup orders in the US. This version is set up for Germany: the board can be switched between German and English, units are metric, everything runs on your own server, and the shopping list targets REWE (or any other supermarket). Detailed guides are available in English (`docs/en/`) and German (`docs/`).
 
 ### Features
 
@@ -21,6 +21,7 @@ Based on [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-Boar
 - **Requests:** "more fish", "nothing elaborate the week of the 20th"; the next plan takes them into account.
 - **Recipe database:** add your own recipes, import them from a link (Chefkoch, REWE, Lecker …), let the AI convert pasted text or invent a new recipe. Any recipe can be scheduled for a specific day. Meals rated 4–5 stars are added to the database automatically.
 - **Metric:** recipes in g, ml, tbsp, tsp and °C with oven mode; imported imperial recipes are converted (with AI).
+- **German or English:** switch the language in the board under "Feedback → Setup". It applies to the whole household, including notifications, shopping lists and new AI recipes.
 
 **Automatically, on a schedule:**
 
@@ -84,6 +85,7 @@ Set at least these values in `.env`:
 - `LLM_PROVIDER` – start with `none`; later `claude` (plus `ANTHROPIC_API_KEY`) or `ollama`, see [docs/en/ai.md](docs/en/ai.md)
 - Leave the Home Assistant settings empty for now; see [docs/en/home-assistant.md](docs/en/home-assistant.md)
 - Using a store other than REWE: change `SB_STORE_NAME`, `SB_STORE_URL` and `SB_STORE_SEARCH_URL`
+- `SB_LANGUAGE=en` starts the board in English (it can be switched in the board at any time)
 
 **3. Build the container** (takes a few minutes the first time)
 
@@ -121,9 +123,10 @@ If you get `{"ok":true}`, open `http://<server-ip>:8080` on your phone, log in w
 
 **7. First steps in the board**
 
-1. Under "Feedback", adjust the dietary guidelines.
-2. Under "Rezepte", add a few recipes (without AI, plans are built from them).
-3. Under "Plan", tap "Ersten Plan erstellen".
+1. Under "Feedback → Einrichtung", switch the language to English if you like (the board starts in German unless `SB_LANGUAGE=en`).
+2. Under "Feedback", adjust the dietary guidelines.
+3. Under "Recipes", add a few recipes (without AI, plans are built from them).
+4. Under "Plan", tap "Create first plan".
 
 **Updating**
 
@@ -178,6 +181,7 @@ Basiert auf [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-B
 - **Wünsche:** „mehr Fisch“, „in der Woche vom 20. nichts Aufwendiges“ – der nächste Plan berücksichtigt das.
 - **Rezeptdatenbank:** eigene Rezepte anlegen, per Link importieren (Chefkoch, REWE, Lecker …), Text von der KI umwandeln lassen oder ein neues Rezept erfinden lassen. Jedes Rezept lässt sich direkt für einen Tag einplanen. Gut bewertete Gerichte (4–5 Sterne) aus den Plänen landen automatisch in der Datenbank.
 - **Metrisch:** Rezepte in g, ml, EL, TL und °C mit Heizart; englische Rezepte werden beim Import umgerechnet (mit KI).
+- **Deutsch oder Englisch:** Die Sprache lässt sich im Board unter „Feedback → Einrichtung“ umschalten. Sie gilt für den ganzen Haushalt, auch für Benachrichtigungen, Einkaufslisten und neue KI-Rezepte.
 
 **Automatisch nach Zeitplan:**
 
@@ -241,6 +245,7 @@ In der `.env` mindestens diese Werte setzen:
 - `LLM_PROVIDER` – zum Start `none`; später `claude` (mit `ANTHROPIC_API_KEY`) oder `ollama`, siehe [docs/ki.md](docs/ki.md)
 - Home Assistant erst mal leer lassen, siehe [docs/home-assistant.md](docs/home-assistant.md)
 - Anderer Supermarkt als REWE: `SB_STORE_NAME`, `SB_STORE_URL` und `SB_STORE_SEARCH_URL` anpassen
+- `SB_LANGUAGE=en` startet das Board auf Englisch (umschalten geht jederzeit im Board)
 
 **3. Container bauen** (dauert beim ersten Mal ein paar Minuten)
 
@@ -278,9 +283,10 @@ Kommt `{"ok":true}` zurück, auf dem Handy `http://<Server-IP>:8080` öffnen, mi
 
 **7. Erste Schritte im Board**
 
-1. Unter „Feedback“ die Ernährungsrichtlinien anpassen.
-2. Unter „Rezepte“ ein paar Rezepte anlegen (ohne KI wird der Plan daraus erstellt).
-3. Unter „Plan“ auf „Ersten Plan erstellen“ tippen.
+1. Unter „Feedback → Einrichtung“ bei Bedarf die Sprache wählen (Deutsch oder Englisch).
+2. Unter „Feedback“ die Ernährungsrichtlinien anpassen.
+3. Unter „Rezepte“ ein paar Rezepte anlegen (ohne KI wird der Plan daraus erstellt).
+4. Unter „Plan“ auf „Ersten Plan erstellen“ tippen.
 
 **Aktualisieren**
 

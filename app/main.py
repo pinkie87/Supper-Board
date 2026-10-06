@@ -14,8 +14,9 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from . import llm, notify, planner, recipes, scheduler
+from . import i18n, llm, notify, planner, recipes, scheduler
 from .config import Settings, settings as default_settings
+from .i18n import T
 from .seed import seed
 from .store import COLLECTIONS, NotFound, Store
 
@@ -25,8 +26,9 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 
 def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> FastAPI:
     settings = settings or default_settings
+    i18n.set_default(settings.language)
     store = Store(settings.db_path)
-    seed(store)
+    seed(store, settings.language)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -42,9 +44,12 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     app.state.settings = settings
     background: set[asyncio.Task] = set()
 
-    # ---------- Passwortschutz (optional) ----------
+    # ---------- Sprache und Passwortschutz ----------
     @app.middleware("http")
     async def auth(request: Request, call_next):
+        # Das Board schickt seine Sprache mit; sonst gilt die Einstellung des Haushalts.
+        wanted = request.headers.get("x-lang", "")
+        i18n.set_lang(wanted if wanted in i18n.LANGUAGES else i18n.household_lang(store))
         if settings.password and request.url.path != "/api/health":
             ok = False
             header = request.headers.get("authorization", "")
@@ -55,13 +60,13 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
                 except Exception:  # noqa: BLE001
                     ok = False
             if not ok:
-                return Response("Anmeldung erforderlich", status_code=401,
+                return Response(T("Anmeldung erforderlich", "Login required"), status_code=401,
                                 headers={"WWW-Authenticate": 'Basic realm="Supper Board", charset="UTF-8"'})
         return await call_next(request)
 
     def col_or_404(col: str) -> str:
         if col not in COLLECTIONS:
-            raise HTTPException(404, "Unbekannte Sammlung")
+            raise HTTPException(404, T("Unbekannte Sammlung", "Unknown collection"))
         return col
 
     # ---------- Seite ----------
@@ -92,8 +97,9 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
             "llm": settings.llm_provider if settings.llm_enabled else "none",
             "llmLabel": {"claude": "Claude", "ollama": "Ollama"}.get(settings.llm_provider, ""),
             "notify": notify.enabled(settings),
-            "draftDay": planner.WD_LONG[settings.draft_weekday], "listDay": planner.WD_LONG[settings.list_weekday],
-            "shopDay": planner.WD_LONG[settings.shop_weekday],
+            "draftDay": planner.wd_long(settings.draft_weekday), "listDay": planner.wd_long(settings.list_weekday),
+            "shopDay": planner.wd_long(settings.shop_weekday),
+            "language": i18n.household_lang(store),
             "draftWd": settings.draft_weekday, "listWd": settings.list_weekday, "shopWd": settings.shop_weekday,
         }
 
@@ -112,7 +118,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         if doc is None:
             if missing == "null":  # Live-Abos fragen auch nach Dokumenten, die es (noch) nicht gibt
                 return None
-            raise HTTPException(404, "Nicht gefunden")
+            raise HTTPException(404, T("Nicht gefunden", "Not found"))
         return doc
 
     @app.put("/api/db/{col}/{doc_id}")
@@ -125,7 +131,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         try:
             store.update(col_or_404(col), doc_id, data)
         except NotFound:
-            raise HTTPException(404, "Nicht gefunden")
+            raise HTTPException(404, T("Nicht gefunden", "Not found"))
         return {"ok": True}
 
     @app.delete("/api/db/{col}/{doc_id}")
@@ -157,7 +163,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     # ---------- Aktionen ----------
     def start_job(name: str, fn) -> JSONResponse:
         if planner._job_lock.locked():
-            return JSONResponse({"ok": False, "message": "Es läuft schon eine Aufgabe."}, status_code=409)
+            return JSONResponse({"ok": False, "message": T("Es läuft schon eine Aufgabe.", "A job is already running.")}, status_code=409)
         task = asyncio.create_task(planner.run_job(store, settings, name, fn))
         background.add(task)
         task.add_done_callback(background.discard)
@@ -186,10 +192,12 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     @app.post("/api/actions/notify-test")
     async def action_notify_test():
         if not notify.enabled(settings):
-            raise HTTPException(400, "Home Assistant ist nicht eingerichtet (HA_URL, HA_TOKEN, HA_NOTIFY).")
-        ok = await notify.send(settings, "Supper Board", "Testnachricht – Benachrichtigungen funktionieren.")
+            raise HTTPException(400, T("Home Assistant ist nicht eingerichtet (HA_URL, HA_TOKEN, HA_NOTIFY).",
+                                      "Home Assistant is not set up (HA_URL, HA_TOKEN, HA_NOTIFY)."))
+        ok = await notify.send(settings, "Supper Board", T("Testnachricht – Benachrichtigungen funktionieren.", "Test message – notifications work."))
         if not ok:
-            raise HTTPException(502, "Home Assistant hat die Nachricht nicht angenommen. Details im Server-Log.")
+            raise HTTPException(502, T("Home Assistant hat die Nachricht nicht angenommen. Details im Server-Log.",
+                                      "Home Assistant did not accept the message. See the server log for details."))
         return {"ok": True}
 
     @app.post("/api/meals/{col}/{doc_id}/save-recipe")
@@ -198,7 +206,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
             raise HTTPException(404)
         meal = store.get(col, doc_id)
         if not meal or not meal.get("recipe"):
-            raise HTTPException(404, "Dieses Gericht hat kein Rezept.")
+            raise HTTPException(404, T("Dieses Gericht hat kein Rezept.", "This meal has no recipe."))
         rid = planner.save_meal_as_recipe(store, meal)
         store.update(col, doc_id, {"recipeId": rid})
         return {"id": rid}
@@ -206,7 +214,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     # ---------- Rezepte ----------
     def llm_or_400():
         if not settings.llm_enabled:
-            raise HTTPException(400, "Dafür ist eine KI nötig (LLM_PROVIDER=claude oder ollama).")
+            raise HTTPException(400, T("Dafür ist eine KI nötig (LLM_PROVIDER=claude oder ollama).", "This needs an AI (LLM_PROVIDER=claude or ollama)."))
 
     async def llm_call(coro):
         try:
@@ -226,7 +234,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
             recipe = await llm_call(planner.recipe_from_text(settings, json.dumps(recipe, ensure_ascii=False)))
         if not recipe:
             if not settings.llm_enabled:
-                raise HTTPException(400, "Auf dieser Seite wurden keine Rezeptdaten gefunden.")
+                raise HTTPException(400, T("Auf dieser Seite wurden keine Rezeptdaten gefunden.", "No recipe data was found on this page."))
             recipe = await llm_call(planner.recipe_from_text(settings, recipes.page_text(page)))
         recipe["source"] = url
         return recipe
@@ -236,9 +244,9 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         llm_or_400()
         text = (body.get("text") or "").strip()
         if len(text) < 20:
-            raise HTTPException(400, "Bitte den Rezepttext einfügen.")
+            raise HTTPException(400, T("Bitte den Rezepttext einfügen.", "Please paste the recipe text."))
         recipe = await llm_call(planner.recipe_from_text(settings, text))
-        recipe["source"] = "Text (KI)"
+        recipe["source"] = T("Text (KI)", "Text (AI)")
         return recipe
 
     @app.post("/api/recipes/generate")
@@ -246,9 +254,9 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         llm_or_400()
         wish = (body.get("wish") or "").strip()
         if not wish:
-            raise HTTPException(400, "Bitte beschreiben, was für ein Rezept es sein soll.")
+            raise HTTPException(400, T("Bitte beschreiben, was für ein Rezept es sein soll.", "Please describe what kind of recipe you want."))
         recipe = await llm_call(planner.recipe_generate(store, settings, wish))
-        recipe["source"] = f"KI ({settings.llm_provider})"
+        recipe["source"] = T(f"KI ({settings.llm_provider})", f"AI ({settings.llm_provider})")
         return recipe
 
     # ---------- Home Assistant: Sensor-Daten ----------
@@ -259,14 +267,13 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         tonight = meals.get(t.isoformat())
         tomorrow = meals.get((t + timedelta(days=1)).isoformat())
         cur = store.get("plan", "current") or {}
-        sections, _ = planner.order_items(store)
         return {
             "tonight": tonight["title"] if tonight else "",
             "tonight_kind": tonight["kind"] if tonight else "",
             "tomorrow": tomorrow["title"] if tomorrow else "",
             "thaw_tonight": tomorrow.get("thaw", "") if tomorrow and not tomorrow.get("thawDone") else "",
             "status": cur.get("status", "active"),
-            "next_order_items": sum(1 for g in sections if g["section"] == "Zusätzlich" for _ in g["items"]),
+            "next_order_items": len(store.list("grocery")) + sum(1 for s in store.list("staples") if s.get("status") == "low"),
         }
 
     return app

@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .i18n import T
+
 RECIPE_FIELDS = ("title", "description", "serves", "time", "oven", "ingredients", "steps", "tip", "tags")
 
 # Für die KI: ein Rezept im Format des Boards.
@@ -56,7 +58,7 @@ def clean_recipe(data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(tags, str):
         tags = tags.split(",")
     return {
-        "title": text(data.get("title")) or "Ohne Titel",
+        "title": text(data.get("title")) or T("Ohne Titel", "Untitled"),
         "description": text(data.get("description")),
         "serves": max(serves, 0),
         "time": text(data.get("time")),
@@ -83,15 +85,15 @@ def _check_url(url: str) -> None:
     """Nur öffentliche http(s)-Adressen – das Board soll nicht ins eigene Heimnetz greifen."""
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        raise ImportError_("Bitte einen vollständigen Link angeben, der mit https:// beginnt.")
+        raise ImportError_(T("Bitte einen vollständigen Link angeben, der mit https:// beginnt.", "Please enter a full link starting with https://."))
     try:
         infos = socket.getaddrinfo(parsed.hostname, None)
     except socket.gaierror as e:
-        raise ImportError_("Die Adresse wurde nicht gefunden.") from e
+        raise ImportError_(T("Die Adresse wurde nicht gefunden.", "The address could not be found.")) from e
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         if not ip.is_global:
-            raise ImportError_("Links ins lokale Netz werden nicht abgerufen.")
+            raise ImportError_(T("Links ins lokale Netz werden nicht abgerufen.", "Links into the local network are not fetched."))
 
 
 async def fetch_page(url: str) -> str:
@@ -110,9 +112,9 @@ async def fetch_page(url: str) -> str:
                 _check_url(url)
                 r = await client.get(url)
     except httpx.HTTPError as e:
-        raise ImportError_("Die Seite konnte nicht geladen werden.") from e
+        raise ImportError_(T("Die Seite konnte nicht geladen werden.", "The page could not be loaded.")) from e
     if r.status_code >= 400:
-        raise ImportError_(f"Die Seite antwortet mit Fehler {r.status_code}.")
+        raise ImportError_(T(f"Die Seite antwortet mit Fehler {r.status_code}.", f"The page returned error {r.status_code}."))
     return r.text[:3_000_000]
 
 
@@ -129,8 +131,8 @@ def _minutes_text(minutes: int) -> str:
         return ""
     h, m = divmod(minutes, 60)
     if h and m:
-        return f"{h} Std. {m} Min."
-    return f"{h} Std." if h else f"{m} Min."
+        return T(f"{h} Std. {m} Min.", f"{h} h {m} min")
+    return (T(f"{h} Std.", f"{h} h") if h else T(f"{m} Min.", f"{m} min"))
 
 
 def _types(node: dict) -> list[str]:

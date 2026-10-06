@@ -2,7 +2,7 @@
 
 # KI einrichten
 
-Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt eingefügte Rezepttexte um und erfindet Rezepte auf Wunsch. Umschalten in der `.env` mit `LLM_PROVIDER` und danach den Dienst neu starten.
+Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt eingefügte Rezepttexte um und erfindet Rezepte auf Wunsch. Umschalten in der `.env` mit `LLM_PROVIDER` und danach den Dienst neu starten. Rezepte und Pläne schreibt die KI in der Sprache des Boards (Deutsch oder Englisch), immer metrisch.
 
 | `LLM_PROVIDER` | Was passiert | Datenschutz |
 |---|---|---|

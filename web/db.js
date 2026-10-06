@@ -10,21 +10,24 @@
   "use strict";
 
   function err(code, message) { var e = new Error(message); e.code = code; return e; }
+  // Sprache des Boards (setzt index.html), damit Fehlermeldungen vom Server passen
+  function lang() { return (window.SB && window.SB.lang) || document.documentElement.lang || "de"; }
+  function t(de, en) { return lang() === "en" ? en : de; }
 
   async function api(method, url, body) {
     var res;
     try {
       res = await fetch(url, {
         method: method,
-        headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+        headers: body !== undefined ? { "Content-Type": "application/json", "X-Lang": lang() } : { "X-Lang": lang() },
         body: body !== undefined ? JSON.stringify(body) : undefined,
         credentials: "same-origin"
       });
-    } catch (e) { throw err("unavailable", "Keine Verbindung zum Server"); }
-    if (res.status === 404) throw err("not_found", "Nicht gefunden");
+    } catch (e) { throw err("unavailable", t("Keine Verbindung zum Server", "No connection to the server")); }
+    if (res.status === 404) throw err("not_found", t("Nicht gefunden", "Not found"));
     var data = null;
     try { data = await res.json(); } catch (e) {}
-    if (!res.ok) throw err(res.status >= 500 ? "unavailable" : "failed", (data && (data.detail || data.message)) || ("Fehler " + res.status));
+    if (!res.ok) throw err(res.status >= 500 ? "unavailable" : "failed", (data && (data.detail || data.message)) || (t("Fehler ", "Error ") + res.status));
     return data;
   }
 

@@ -2,7 +2,7 @@
 
 # AI setup
 
-The AI writes new meal plans, replaces meals you reject, converts pasted recipe text and invents recipes on request. Switch it with `LLM_PROVIDER` in `.env`, then restart the service. Recipes and plans are written in German with metric units.
+The AI writes new meal plans, replaces meals you reject, converts pasted recipe text and invents recipes on request. Switch it with `LLM_PROVIDER` in `.env`, then restart the service. Recipes and plans are written in the board's language (German or English), always with metric units.
 
 | `LLM_PROVIDER` | What happens | Privacy |
 |---|---|---|
@@ -57,4 +57,4 @@ Cost: a two-week plan with all recipes costs roughly 10–50 cents with Opus, a 
    OLLAMA_MODEL=qwen3:14b
    ```
 
-**Which model?** A two-week plan is a long, structured answer. Models from about 14 billion parameters (e.g. `qwen3:14b`, `gemma3:27b`, `mistral-small`) produce usable German recipes; smaller models more often invent odd quantities. Without a GPU a plan can take several minutes; the board shows a progress note meanwhile.
+**Which model?** A two-week plan is a long, structured answer. Models from about 14 billion parameters (e.g. `qwen3:14b`, `gemma3:27b`, `mistral-small`) produce usable recipes; smaller models more often invent odd quantities. Without a GPU a plan can take several minutes; the board shows a progress note meanwhile.

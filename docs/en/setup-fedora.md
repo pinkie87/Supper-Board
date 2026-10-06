@@ -30,6 +30,7 @@ Adjust at least:
 | `LLM_PROVIDER` | `claude`, `ollama` or `none`, see [ai.md](ai.md) |
 | `HA_URL`, `HA_TOKEN`, `HA_NOTIFY` | Home Assistant, see [home-assistant.md](home-assistant.md) |
 | `SB_SHOP_DAY` | Weekday you go shopping (default: `sa`) |
+| `SB_LANGUAGE` | `de` or `en`: language the board starts in; can be switched in the board later |
 
 Weekdays in `.env` use German abbreviations: `mo di mi do fr sa so` (Monday to Sunday).
 

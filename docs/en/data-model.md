@@ -66,7 +66,7 @@ A recipe's rating is derived from all meals with a matching `recipeId`.
 | `staples` | `{name, group, status, order}` – pantry, `status`: `have`, `low` or `unknown` |
 | `freezer` | `{name, forMeal, at}` – freezer contents |
 
-### `plan` (three documents)
+### `plan` (four documents)
 
 **`plan/current`**
 
@@ -86,9 +86,11 @@ A recipe's rating is derived from all meals with a matching `recipeId`.
 | `summary`, `prep` | what's new; "freeze on arrival: …" |
 | `groceries` | `[{section, items: []}]` |
 | `orderText` | finished shopping list to copy |
-| `included` | `{grocery: [ids], staples: [ids]}` – cleared when you tap "Eingekauft" |
+| `included` | `{grocery: [ids], staples: [ids]}` – cleared when you tap "Bought" |
 
 **`plan/job`** – state of the currently running job: `{name, state: "running"|"done"|"error", message}`.
+
+**`plan/settings`** – household settings: `{language: "de"|"en"}`. Missing until someone switches the language; until then `SB_LANGUAGE` applies.
 
 ## Status flow
 
@@ -96,9 +98,9 @@ A recipe's rating is derived from all meals with a matching `recipeId`.
 stateDiagram-v2
   [*] --> active
   active --> drafted: plan drafted
-  drafted --> approved: "Plan freigeben"
+  drafted --> approved: "Approve plan"
   drafted --> list_ready: shopping list (not approved yet)
   approved --> list_ready: shopping list
-  list_ready --> ordered: "Eingekauft"
+  list_ready --> ordered: "Bought"
   ordered --> active: first day of the new plan
 ```
