@@ -105,6 +105,15 @@ class Store:
             rows = self._db.execute("SELECT id, data FROM docs WHERE col=? ORDER BY id", (col,)).fetchall()
         return [dict(json.loads(data), id=doc_id) for doc_id, data in rows]
 
+    def find(self, col: str, key: str, value: Any) -> list[dict]:
+        """Dokumente einer Sammlung, deren Feld ``key`` gleich ``value`` ist (Filter in SQLite)."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT id, data FROM docs WHERE col=? AND json_extract(data, ?)=? ORDER BY id",
+                (col, f"$.{key}", value),
+            ).fetchall()
+        return [dict(json.loads(data), id=doc_id) for doc_id, data in rows]
+
     # ---------- Schreiben ----------
     def set(self, col: str, doc_id: str, data: dict[str, Any]) -> None:
         clean = {k: v for k, v in data.items() if k not in ("id", "_col")}
