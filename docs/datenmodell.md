@@ -53,6 +53,7 @@ Vergangene Gerichte, damit Bewertungen über alle Pläne hinweg zählen.
 | `tags` | Schlagworte |
 | `source` | Link oder Herkunft („eigenes Rezept“, „KI-Plan“) |
 | `createdAt` | Zeitpunkt |
+| `version`, `versionNote`, `updatedAt` | Versionsnummer, Notiz zur letzten Änderung, Zeitpunkt – setzt der Server beim Speichern |
 
 Die Bewertung eines Rezepts ergibt sich aus allen Gerichten mit passender `recipeId`.
 
@@ -66,6 +67,7 @@ Die Bewertung eines Rezepts ergibt sich aus allen Gerichten mit passender `recip
 | `staples` | `{name, group, status, order}` – Grundvorrat, `status`: `have`, `low` oder `unknown` |
 | `freezer` | `{name, forMeal, at}` – Gefrierschrankinhalt |
 | `imports` | `{state, images, recipes, message, order, createdAt}` – Foto-Import: `state` ist `waiting`, `working`, `done` oder `error`; `recipes` sind die erkannten, noch nicht geprüften Rezepte. Die Fotos liegen in `uploads/`. |
+| `recipe_versions` | `{recipe, version, note, at, data}` – frühere Fassungen eines Rezepts (`data` = Rezeptfelder), höchstens 30 pro Rezept |
 
 ### `plan` (vier Dokumente)
 

@@ -2,7 +2,7 @@
 
 # AI setup
 
-The AI writes new meal plans, replaces meals you reject, converts pasted recipe text, reads recipes from photos and invents recipes on request. Switch it with `LLM_PROVIDER` in `.env`, then restart the service. Recipes and plans are written in the board's language (German or English), always with metric units.
+The AI writes new meal plans, replaces meals you reject, converts pasted recipe text, reads recipes from photos, invents recipes on request and revises saved recipes. Switch it with `LLM_PROVIDER` in `.env`, then restart the service. Recipes and plans are written in the board's language (German or English), always with metric units.
 
 | `LLM_PROVIDER` | What happens | Privacy |
 |---|---|---|
@@ -97,6 +97,19 @@ Conversion settings (remembered per device):
 | Spoons | as tbsp/tsp or in ml |
 
 Converted values are rounded to practical numbers: 454 g → 450 g, 355 ml → 350 ml, 1.5 cups (German) → 375 ml, 350 °F → 175 °C. Fahrenheit is always converted to °C, inches to cm.
+
+## Revising recipes with AI
+
+Every saved recipe has "Revise with AI" – handy after a photo import or for older recipes of your own:
+
+- **"Check and correct"** fixes reading and typing errors, makes amounts consistent (metric, rounded), adds ingredients that appear in the steps but are missing from the list, and resolves `[?]` marks when they are clear from context. The dish itself stays the same.
+- **"Adapt"** changes the recipe to a request, e.g. "vegetarian", "vegan", "gluten-free" or in your own words ("lentils instead of mince"). The household's dietary guidelines are taken into account.
+
+The result is a **proposal**: the form shows the list of changes at the top and can still be edited. "Apply" replaces the recipe – the previous version is kept. "Save as new recipe" creates a variant and leaves the original unchanged.
+
+### Versions
+
+Every change to a recipe's content (editing, applying an AI proposal) keeps the previous version. "Versions" lists all versions with date and change note; "View" shows an older version, "Restore" makes it the current one again (which is itself a new version, so nothing is lost). The last 30 versions are kept per recipe. Deleting a recipe also deletes its versions.
 
 ## OpenAI-compatible server (llama.cpp, LM Studio, vLLM, Unsloth models)
 

@@ -17,7 +17,7 @@ from typing import Any
 
 COLLECTIONS = {
     "meals", "draft", "history", "notes", "ideas", "grocery",
-    "staples", "freezer", "plan", "recipes", "imports",
+    "staples", "freezer", "plan", "recipes", "imports", "recipe_versions",
 }
 
 

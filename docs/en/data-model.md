@@ -53,6 +53,7 @@ Past meals, so ratings count across all plans.
 | `tags` | keywords |
 | `source` | link or origin ("eigenes Rezept", "KI-Plan") |
 | `createdAt` | timestamp |
+| `version`, `versionNote`, `updatedAt` | version number, note on the last change, timestamp – set by the server on save |
 
 A recipe's rating is derived from all meals with a matching `recipeId`.
 
@@ -66,6 +67,7 @@ A recipe's rating is derived from all meals with a matching `recipeId`.
 | `staples` | `{name, group, status, order}` – pantry, `status`: `have`, `low` or `unknown` |
 | `freezer` | `{name, forMeal, at}` – freezer contents |
 | `imports` | `{state, images, recipes, message, order, createdAt}` – photo import: `state` is `waiting`, `working`, `done` or `error`; `recipes` are the recipes found but not yet reviewed. The photos are stored in `uploads/`. |
+| `recipe_versions` | `{recipe, version, note, at, data}` – earlier versions of a recipe (`data` = recipe fields), at most 30 per recipe |
 
 ### `plan` (four documents)
 

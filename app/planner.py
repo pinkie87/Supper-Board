@@ -6,6 +6,7 @@ entwerfen, Donnerstag: Einkaufsliste) durch Funktionen auf dem eigenen Server.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import random
 from datetime import date, datetime, timedelta
@@ -569,6 +570,50 @@ Ernährungsrichtlinien des Haushalts:
 Portionen passend zum Haushalt, falls der Wunsch nichts anderes sagt. Tags: 2–5 kurze Schlagworte."""
     system = system_prompt(settings)
     return clean_recipe(await llm.generate_json(settings, system, prompt, RECIPE_SCHEMA))
+
+
+REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {"recipe": RECIPE_SCHEMA, "changes": {"type": "array", "items": {"type": "string"}}},
+    "required": ["recipe", "changes"],
+    "additionalProperties": False,
+}
+
+
+async def recipe_review(store: Store, settings: Settings, recipe: dict, mode: str, wish: str = "") -> dict:
+    """Ein gespeichertes Rezept von der KI prüfen lassen ("check") oder umbauen ("variant")."""
+    current = {k: recipe.get(k) for k in ("title", "description", "serves", "time", "oven", "ingredients", "steps", "tip", "tags")}
+    data = json.dumps(current, ensure_ascii=False, indent=1)
+    if mode == "variant":
+        cur = store.get("plan", "current") or {}
+        task = f"""Baue dieses Rezept nach folgendem Wunsch um: {wish}
+
+Ersetze oder ändere Zutaten sinnvoll und passe Mengen, Schritte, Zeit, Ofenangabe und Tipp daran an. Das Gericht soll erkennbar bleiben, nur eben passend zum Wunsch. Passe den Titel an, wenn sich das Gericht dadurch ändert (z. B. „… (vegetarisch)“), und ergänze passende Tags.
+Ernährungsrichtlinien des Haushalts:
+{cur.get("guidelines") or "(keine)"}"""
+    else:
+        task = """Prüfe dieses Rezept. Es wurde z. B. per Texterkennung oder von Hand erfasst und kann Fehler enthalten.
+- Behebe offensichtliche Erkennungs- und Tippfehler; Zahlen nur ändern, wenn der Fehler eindeutig ist.
+- Mengen einheitlich und metrisch, praxistauglich gerundet; Löffel als EL/TL.
+- Zutaten, die in den Schritten eindeutig vorkommen, aber in der Liste fehlen, ergänzen.
+- Schritte klar und in sinnvoller Reihenfolge; Zeit, Portionen und Ofenangabe ergänzen, wenn sie sich aus dem Text ergeben.
+- Mit [?] markierte Stellen auflösen, wenn sie aus dem Zusammenhang eindeutig sind, sonst stehen lassen.
+- 2–5 passende Tags.
+- Das Gericht selbst nicht verändern."""
+    prompt = f"""{task}
+
+Liste in "changes" jede Änderung in einem kurzen Satz auf (leere Liste, wenn alles passt).
+
+REZEPT (JSON):
+{data}"""
+    result = await llm.generate_json(settings, system_prompt(settings), prompt, REVIEW_SCHEMA)
+    proposal = clean_recipe(result.get("recipe") or {})
+    for keep in ("source", "createdAt"):
+        if recipe.get(keep):
+            proposal[keep] = recipe[keep]
+    changes = [str(c).strip() for c in result.get("changes") or [] if str(c).strip()]
+    note = (T("KI: ", "AI: ") + wish.strip()[:60]) if mode == "variant" else T("KI: geprüft und korrigiert", "AI: checked and corrected")
+    return {"recipe": proposal, "changes": changes, "note": note}
 
 
 # ---------- Hintergrundaufgaben ----------

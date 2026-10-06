@@ -14,12 +14,12 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from . import i18n, llm, notify, photos, planner, recipes, scheduler, textparse
+from . import i18n, llm, notify, photos, planner, recipes, scheduler, textparse, versions
 from .config import Settings, settings as default_settings
 from .i18n import T
 from .seed import seed
 from .units import UnitOptions
-from .store import COLLECTIONS, NotFound, Store
+from .store import COLLECTIONS, NotFound, Store, merge, new_id
 
 log = logging.getLogger("supper_board")
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -114,6 +114,10 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
 
     @app.post("/api/db/{col}")
     async def add_doc(col: str, data: dict[str, Any] = Body(...)):
+        if col == "recipes":  # Rezepte bekommen eine Versionsnummer
+            doc_id = new_id()
+            versions.save(store, doc_id, data, data.get("_note"))
+            return {"id": doc_id}
         return {"id": store.add(col_or_404(col), data)}
 
     @app.get("/api/db/{col}/{doc_id}")
@@ -127,11 +131,20 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
 
     @app.put("/api/db/{col}/{doc_id}")
     async def set_doc(col: str, doc_id: str, data: dict[str, Any] = Body(...)):
+        if col == "recipes":  # vorherige Fassung als Version aufheben
+            versions.save(store, doc_id, data, data.get("_note"))
+            return {"ok": True}
         store.set(col_or_404(col), doc_id, data)
         return {"ok": True}
 
     @app.patch("/api/db/{col}/{doc_id}")
     async def update_doc(col: str, doc_id: str, data: dict[str, Any] = Body(...)):
+        if col == "recipes":
+            old = store.get("recipes", doc_id)
+            if old is None:
+                raise HTTPException(404, T("Nicht gefunden", "Not found"))
+            versions.save(store, doc_id, merge(dict(old), data), data.get("_note"))
+            return {"ok": True}
         try:
             store.update(col_or_404(col), doc_id, data)
         except NotFound:
@@ -141,6 +154,8 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
     @app.delete("/api/db/{col}/{doc_id}")
     async def delete_doc(col: str, doc_id: str):
         store.delete(col_or_404(col), doc_id)
+        if col == "recipes":
+            versions.delete_all(store, doc_id)
         return {"ok": True}
 
     @app.get("/api/events")
@@ -275,6 +290,29 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
         recipe = await llm_call(planner.recipe_generate(store, settings, wish))
         recipe["source"] = T(f"KI ({settings.llm_provider})", f"AI ({settings.llm_provider})")
         return recipe
+
+    # ---------- Versionen und KI-Überarbeitung ----------
+    @app.get("/api/recipes/{recipe_id}/versions")
+    async def recipe_versions(recipe_id: str):
+        return versions.list_versions(store, recipe_id)
+
+    @app.post("/api/recipes/{recipe_id}/versions/{version_id}/restore")
+    async def restore_version(recipe_id: str, version_id: str):
+        if versions.restore(store, recipe_id, version_id) is None:
+            raise HTTPException(404, T("Nicht gefunden", "Not found"))
+        return {"ok": True}
+
+    @app.post("/api/recipes/{recipe_id}/ai-review")
+    async def ai_review(recipe_id: str, body: dict[str, Any] = Body(...)):
+        llm_or_400()
+        recipe = store.get("recipes", recipe_id)
+        if recipe is None:
+            raise HTTPException(404, T("Nicht gefunden", "Not found"))
+        mode = "variant" if body.get("mode") == "variant" else "check"
+        wish = str(body.get("wish") or "").strip()[:500]
+        if mode == "variant" and not wish:
+            raise HTTPException(400, T("Bitte angeben, wie das Rezept umgebaut werden soll.", "Please say how the recipe should be changed."))
+        return await llm_call(planner.recipe_review(store, settings, recipe, mode, wish))
 
     # ---------- Rezepte von Fotos ----------
     @app.post("/api/imports")
