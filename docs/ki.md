@@ -2,7 +2,7 @@
 
 # KI einrichten
 
-Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt eingefügte Rezepttexte um, liest Rezepte von Fotos und erfindet Rezepte auf Wunsch. Umschalten in der `.env` mit `LLM_PROVIDER` und danach den Dienst neu starten. Rezepte und Pläne schreibt die KI in der Sprache des Boards (Deutsch oder Englisch), immer metrisch.
+Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt eingefügte Rezepttexte um, liest Rezepte von Fotos, erfindet Rezepte auf Wunsch und überarbeitet gespeicherte Rezepte. Umschalten in der `.env` mit `LLM_PROVIDER` und danach den Dienst neu starten. Rezepte und Pläne schreibt die KI in der Sprache des Boards (Deutsch oder Englisch), immer metrisch.
 
 | `LLM_PROVIDER` | Was passiert | Datenschutz |
 |---|---|---|
@@ -97,6 +97,19 @@ Einstellungen für die Umrechnung (merkt sich das Board pro Gerät):
 | Löffel | als EL/TL oder in ml |
 
 Umgerechnete Werte werden auf praxistaugliche Zahlen gerundet: 454 g → 450 g, 355 ml → 350 ml, 1,5 Tassen (deutsch) → 375 ml, 350 °F → 175 °C. Fahrenheit wird immer in °C umgerechnet, Zoll in cm.
+
+## Rezepte mit KI überarbeiten
+
+In jedem gespeicherten Rezept gibt es „Mit KI überarbeiten“ – praktisch nach einem Foto-Import oder für ältere eigene Rezepte:
+
+- **„Prüfen und korrigieren“** behebt Lese- und Tippfehler, vereinheitlicht Mengen (metrisch, gerundet), ergänzt Zutaten, die in den Schritten vorkommen, aber in der Liste fehlen, und löst `[?]`-Stellen auf, wenn sie eindeutig sind. Das Gericht selbst bleibt gleich.
+- **„Umbauen“** ändert das Rezept nach einem Wunsch, z. B. „vegetarisch“, „vegan“, „glutenfrei“ oder frei formuliert („mit Linsen statt Hack“). Die Ernährungsrichtlinien des Haushalts werden berücksichtigt.
+
+Das Ergebnis ist ein **Vorschlag**: Das Formular zeigt oben die Liste der Änderungen und lässt sich noch anpassen. „Übernehmen“ ersetzt das Rezept – die bisherige Fassung bleibt als Version erhalten. „Als neues Rezept speichern“ legt eine Variante an und lässt das Original unverändert.
+
+### Versionen
+
+Jede inhaltliche Änderung an einem Rezept (Bearbeiten, KI-Vorschlag übernehmen) hebt die vorherige Fassung auf. Unter „Versionen“ stehen alle Fassungen mit Datum und Änderungsnotiz; „Ansehen“ zeigt eine ältere Fassung, „Wiederherstellen“ macht sie wieder zur aktuellen (auch das ist wieder eine neue Version, nichts geht verloren). Pro Rezept werden die letzten 30 Versionen aufgehoben. Beim Löschen eines Rezepts werden auch seine Versionen gelöscht.
 
 ## OpenAI-kompatibler Server (llama.cpp, LM Studio, vLLM, Unsloth-Modelle)
 

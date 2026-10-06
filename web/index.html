@@ -225,6 +225,11 @@ h2{font-size:1.15rem;font-weight:700}
 .field input,.field textarea{font:inherit;font-weight:400;color:var(--ink);border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;min-height:44px;width:100%}
 .field textarea{min-height:120px;line-height:1.45}
 .fields2{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.vlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.vlist li{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.vlist .vh{font-weight:700}
+.changes{background:var(--sunk);border-radius:var(--r);padding:10px 14px}
+.changes ul{margin:6px 0 0;padding-left:18px}
 .tool{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
 .rlist{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .rlist li{border-top:1px solid var(--line)}
@@ -1039,19 +1044,54 @@ h2{font-size:1.15rem;font-weight:700}
     if(!r){ closeRecipe(); return; }
     const head = (title)=>'<div class="head"><div><span class="eyebrow">'+L('Rezept','Recipe')+'</span><div class="meal-title" id="rsheetTitle">'+esc(title)+'</div></div><button type="button" class="iconbtn" data-act="recipeClose" aria-label="'+L('Schließen','Close')+'">'+X+'</button></div>';
     if(rOpen.mode==="view"){
-      const st = recipeRating(r.id);
+      const st = recipeRating(r.id), ai = CFG.llm && CFG.llm!=="none";
       const src = r.source && /^https?:/.test(r.source) ? '<a href="'+esc(r.source)+'" target="_blank" rel="noopener">'+L('Originalrezept','Original recipe')+'</a>' : esc(r.source||"");
       $("rsheetDyn").innerHTML = head(r.title)+'<div class="stack" style="margin-top:10px">'+
         (r.description?'<p>'+esc(r.description)+'</p>':'')+
         ((r.tags||[]).length?'<div class="row-btns">'+tagChips(r.tags)+'</div>':'')+
-        '<p class="muted" style="font-size:.88rem">'+[st.avg?"Ø "+L(st.avg.toFixed(1).replace(".",",")+" Sterne",st.avg.toFixed(1)+" stars"):"", st.count?st.count+L("× gekocht","× cooked"):L("noch nicht gekocht","not cooked yet"), src].filter(Boolean).join(" · ")+'</p>'+
+        '<p class="muted" style="font-size:.88rem">'+[st.avg?"Ø "+L(st.avg.toFixed(1).replace(".",",")+" Sterne",st.avg.toFixed(1)+" stars"):"", st.count?st.count+L("× gekocht","× cooked"):L("noch nicht gekocht","not cooked yet"), (r.version||1)>1?"Version "+r.version:"", src].filter(Boolean).join(" · ")+'</p>'+
         '<form class="tool" id="scheduleForm"><label class="field">'+L('Einplanen am','Schedule for')+'<input id="scheduleDate" type="date" value="'+freeDates()+'" required></label><div class="row-btns"><button class="btn small" type="submit">'+L('Einplanen','Schedule')+'</button></div></form>'+
-        '<div class="row-btns"><button type="button" class="btn small ghost" data-act="recipeEdit">'+L('Bearbeiten','Edit')+'</button><button type="button" class="btn small ghost" data-act="recipeDelete">'+L('Löschen','Delete')+'</button></div>'+
+        '<div class="row-btns"><button type="button" class="btn small ghost" data-act="recipeEdit">'+L('Bearbeiten','Edit')+'</button>'+
+          (ai?'<button type="button" class="btn small ghost" data-act="recipeAi">'+L('Mit KI überarbeiten','Revise with AI')+'</button>':'')+
+          '<button type="button" class="btn small ghost" data-act="recipeVersions">'+L('Versionen','Versions')+'</button>'+
+          '<button type="button" class="btn small ghost" data-act="recipeDelete">'+L('Löschen','Delete')+'</button></div>'+
         '</div>'+recipeHtml({id:"r:"+r.id, recipe:r});
+      return;
+    }
+    const back = '<div class="row-btns"><button class="btn small ghost" type="button" data-act="recipeView">'+L('Zurück zum Rezept','Back to recipe')+'</button></div>';
+    if(rOpen.mode==="versions"){
+      const cur = S.recipes.find(x=>x.id===rOpen.id) || r;
+      const vs = rOpen.versions;
+      const when = v => v ? fmt(String(v).slice(0,10),{day:"numeric",month:"numeric",year:"numeric"}) : "";
+      const item = (v, current) => '<li><div class="vh">Version '+esc(v.version||1)+(current?' · '+L('aktuell','current'):'')+'</div>'+
+        '<div class="muted" style="font-size:.88rem">'+[when(current?v.updatedAt||v.createdAt:v.at), esc(current?v.versionNote||"":v.note||"")].filter(Boolean).join(" · ")+'</div>'+
+        (current?'':'<div class="row-btns"><button type="button" class="btn small ghost" data-act="versionShow" data-id="'+esc(v.id)+'">'+(rOpen.show===v.id?L('Ausblenden','Hide'):L('Ansehen','View'))+'</button>'+
+          '<button type="button" class="btn small" data-act="versionRestore" data-id="'+esc(v.id)+'">'+L('Wiederherstellen','Restore')+'</button></div>'+
+          (rOpen.show===v.id?'<div><div class="meal-title" style="font-size:1.1rem">'+esc((v.data||{}).title||"")+'</div>'+recipeHtml({id:"v:"+v.id, recipe:v.data||{}})+'</div>':''))+'</li>';
+      $("rsheetDyn").innerHTML = head(cur.title)+'<div class="stack" style="margin-top:12px"><span class="eyebrow">'+L('Versionen','Versions')+'</span>'+
+        (!vs ? '<p class="muted">'+L('Wird geladen …','Loading …')+'</p>' :
+          '<ul class="vlist">'+item(cur, true)+vs.map(v=>item(v, false)).join("")+'</ul>'+
+          (vs.length?'':'<p class="muted" style="font-size:.88rem">'+L('Noch keine älteren Fassungen. Sobald du das Rezept änderst, bleibt die vorherige Fassung hier erhalten.','No older versions yet. When you change the recipe, the previous version is kept here.')+'</p>'))+
+        back+'</div>';
+      return;
+    }
+    if(rOpen.mode==="ai"){
+      const presets = [[L('vegetarisch','vegetarian')],[L('vegan','vegan')],[L('glutenfrei','gluten-free')],[L('laktosefrei','lactose-free')],[L('kalorienärmer','lighter')],[L('kinderfreundlich','kid-friendly')]];
+      const variant = rOpen.aiMode==="variant";
+      $("rsheetDyn").innerHTML = head(r.title)+'<form class="tool" id="aiReviewForm" style="margin-top:12px" autocomplete="off">'+
+        '<span class="eyebrow">'+L('Mit KI überarbeiten','Revise with AI')+'</span>'+
+        '<label class="check"><input type="radio" name="aiMode" value="check"'+(variant?'':' checked')+'>'+L('Prüfen und korrigieren – z. B. Lesefehler, fehlende Mengen, Einheiten, unklare Schritte','Check and correct – e.g. reading errors, missing amounts, units, unclear steps')+'</label>'+
+        '<label class="check"><input type="radio" name="aiMode" value="variant"'+(variant?' checked':'')+'>'+L('Umbauen, z. B. vegetarisch','Adapt, e.g. vegetarian')+'</label>'+
+        (variant?'<div class="row-btns">'+presets.map(([t])=>'<button type="button" class="btn small ghost" data-act="aiWish" data-v="'+esc(t)+'">'+esc(t)+'</button>').join("")+'</div>'+
+          '<label class="field">'+L('Wunsch','Request')+'<input id="aiWish" name="wish" type="text" required value="'+esc(rOpen.wish||"")+'" placeholder="'+L('z. B. vegetarisch, mit Linsen statt Hack','e.g. vegetarian, lentils instead of mince')+'"></label>':'')+
+        '<p class="muted" style="margin:0;font-size:.88rem">'+L('Du bekommst einen Vorschlag mit einer Liste der Änderungen und entscheidest dann: übernehmen (die jetzige Fassung bleibt als Version erhalten) oder als neues Rezept speichern.','You get a proposal with a list of changes and then decide: apply it (the current version is kept) or save it as a new recipe.')+'</p>'+
+        '<div class="row-btns"><button class="btn small" type="submit"'+(rOpen.busy?' disabled':'')+'>'+(rOpen.busy?L('KI arbeitet …','AI is working …'):L('Vorschlag erstellen','Create proposal'))+'</button>'+
+          '<button class="btn small ghost" type="button" data-act="recipeView">'+L('Abbrechen','Cancel')+'</button></div></form>';
       return;
     }
     const lines = a => esc((a||[]).join("\n"));
     $("rsheetDyn").innerHTML = head(rOpen.id ? L("Rezept bearbeiten","Edit recipe") : L("Neues Rezept","New recipe"))+
+      ((rOpen.changes||[]).length ? '<div class="changes" style="margin-top:12px"><span class="eyebrow">'+L('Vorschlag der KI – Änderungen','AI proposal – changes')+'</span><ul>'+rOpen.changes.map(c=>'<li>'+esc(c)+'</li>').join("")+'</ul></div>' : '')+
       '<form class="stack" id="recipeForm" style="margin-top:12px" autocomplete="off">'+
       '<label class="field">'+L('Titel','Title')+'<input name="title" type="text" required value="'+esc(r.title)+'"></label>'+
       '<label class="field">'+L('Kurzbeschreibung','Short description')+'<input name="description" type="text" value="'+esc(r.description||"")+'"></label>'+
@@ -1063,11 +1103,14 @@ h2{font-size:1.15rem;font-weight:700}
       '<label class="field">'+L('Tipp','Tip')+'<input name="tip" type="text" value="'+esc(r.tip||"")+'"></label>'+
       '<label class="field">'+L('Tags (mit Komma getrennt)','Tags (comma-separated)')+'<input name="tags" type="text" placeholder="'+L('vegetarisch, schnell','vegetarian, quick')+'" value="'+esc((r.tags||[]).join(", "))+'"></label>'+
       '<label class="field">'+L('Quelle','Source')+'<input name="source" type="text" value="'+esc(r.source||"")+'"></label>'+
-      '<div class="row-btns"><button class="btn" type="submit">'+L('Speichern','Save')+'</button><button class="btn ghost" type="button" data-act="'+(rOpen.id?"recipeView":"recipeClose")+'">'+L('Abbrechen','Cancel')+'</button></div></form>'+
+      (rOpen.id?'<label class="field">'+L('Änderungsnotiz (optional)','Change note (optional)')+'<input name="note" type="text" maxlength="120" placeholder="'+L('z. B. weniger Salz','e.g. less salt')+'" value="'+esc(rOpen.note||"")+'"></label>':'')+
+      '<div class="row-btns"><button class="btn" type="submit">'+(rOpen.changes?L('Übernehmen','Apply'):L('Speichern','Save'))+'</button>'+
+        (rOpen.id?'<button class="btn ghost" type="submit" value="new">'+L('Als neues Rezept speichern','Save as new recipe')+'</button>':'')+
+        '<button class="btn ghost" type="button" data-act="'+(rOpen.id?"recipeView":"recipeClose")+'">'+L('Abbrechen','Cancel')+'</button></div></form>'+
       (rOpen.importRef ? '<div class="stack" style="margin-top:16px"><span class="eyebrow">'+L('Foto zum Vergleich','Photo for comparison')+'</span>'+
         Array.from({length:rOpen.importRef.images}, (_,n)=>'<img class="srcimg" src="/api/imports/'+encodeURIComponent(rOpen.importRef.id)+'/image/'+n+'" alt="">').join("")+'</div>' : '');
   }
-  async function saveRecipeForm(form){
+  async function saveRecipeForm(form, asNew){
     const f = new FormData(form), split = (v,re) => String(v||"").split(re).map(s=>s.trim()).filter(Boolean);
     const data = {
       title: String(f.get("title")||"").trim(), description: String(f.get("description")||"").trim(),
@@ -1077,12 +1120,54 @@ h2{font-size:1.15rem;font-weight:700}
     };
     if(!data.title) return;
     const prev = rOpen.id ? S.recipes.find(r=>r.id===rOpen.id) : null;
-    data.createdAt = (prev && prev.createdAt) || new Date().toISOString();
-    let newId = rOpen.id; const importRef = rOpen.importRef;
-    const ok = await save(async()=>{ if(rOpen.id) await db.doc("recipes/"+rOpen.id).set(data); else newId = (await db.collection("recipes").add(data)).id; }, L("Rezept gespeichert","Recipe saved"));
+    const note = String(f.get("note")||"").trim();
+    if(asNew && prev){
+      if(data.title===prev.title) data.title += L(" (Variante)"," (variant)");
+      data._note = L("Variante von „"+prev.title+"“","Variant of “"+prev.title+"”")+(note?" – "+note:"");
+      data.createdAt = new Date().toISOString();
+    } else {
+      data.createdAt = (prev && prev.createdAt) || new Date().toISOString();
+      if(note) data._note = note;
+    }
+    let newId = asNew ? null : rOpen.id; const importRef = rOpen.importRef;
+    const ok = await save(async()=>{ if(newId) await db.doc("recipes/"+newId).set(data); else newId = (await db.collection("recipes").add(data)).id; }, L("Rezept gespeichert","Recipe saved"));
+    delete data._note;
     if(ok){
       if(importRef) await finishImportRecipe(importRef);
       rOpen = {id:newId, mode:"view", data:Object.assign({}, data, {id:newId})}; renderRecipeSheet(); $("rsheet").scrollTop = 0;
+    }
+  }
+  async function loadVersions(){
+    const id = rOpen && rOpen.id; if(!id) return;
+    try{
+      const vs = await window.SB.api("GET", "/api/recipes/"+encodeURIComponent(id)+"/versions");
+      if(rOpen && rOpen.id===id && rOpen.mode==="versions"){ rOpen.versions = vs; renderRecipeSheet(); }
+    }catch(e){ toast(e.message); }
+  }
+  async function restoreVersion(vid){
+    const id = rOpen.id, v = (rOpen.versions||[]).find(x=>x.id===vid); if(!v) return;
+    if(!confirm(L("Version "+v.version+" wiederherstellen? Die jetzige Fassung bleibt als Version erhalten.","Restore version "+v.version+"? The current version is kept."))) return;
+    try{
+      await window.SB.api("POST", "/api/recipes/"+encodeURIComponent(id)+"/versions/"+encodeURIComponent(vid)+"/restore");
+      toast(L("Version "+v.version+" wiederhergestellt","Restored version "+v.version));
+      if(rOpen && rOpen.id===id){ rOpen = {id, mode:"view", data:Object.assign({}, v.data, {id})}; renderRecipeSheet(); $("rsheet").scrollTop = 0; }
+    }catch(e){ toast(e.message); }
+  }
+  async function aiReview(form){
+    const f = new FormData(form), mode = f.get("aiMode")==="variant" ? "variant" : "check", wish = String(f.get("wish")||"").trim();
+    if(mode==="variant" && !wish) return;
+    const id = rOpen.id; rOpen.busy = true; rOpen.wish = wish; renderRecipeSheet();
+    toast(L("Die KI überarbeitet das Rezept …","The AI is revising the recipe …"));
+    try{
+      const res = await window.SB.api("POST", "/api/recipes/"+encodeURIComponent(id)+"/ai-review", {mode, wish});
+      if(!rOpen || rOpen.id!==id) return;
+      const cur = S.recipes.find(x=>x.id===id) || {};
+      rOpen = {id, mode:"edit", data:Object.assign({}, cur, res.recipe), changes:res.changes||[], note:res.note||""};
+      renderRecipeSheet(); $("rsheet").scrollTop = 0;
+      toast(L("Vorschlag bitte prüfen, dann übernehmen oder als neues Rezept speichern.","Please check the proposal, then apply it or save it as a new recipe."));
+    }catch(e){
+      toast(e.message || L("Das hat nicht geklappt.","That didn’t work."));
+      if(rOpen && rOpen.id===id){ rOpen.busy = false; renderRecipeSheet(); }
     }
   }
   async function scheduleRecipe(date){
@@ -1188,6 +1273,11 @@ h2{font-size:1.15rem;font-weight:700}
     else if(act==="recipeClose") closeRecipe();
     else if(act==="recipeEdit"){ rOpen = {id:rOpen.id, mode:"edit", data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id))}; renderRecipeSheet(); }
     else if(act==="recipeView"){ rOpen = {id:rOpen.id, mode:"view"}; renderRecipeSheet(); }
+    else if(act==="recipeVersions"){ rOpen = {id:rOpen.id, mode:"versions", versions:null, data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id) || rOpen.data)}; renderRecipeSheet(); loadVersions(); }
+    else if(act==="versionShow"){ rOpen.show = rOpen.show===id ? null : id; renderRecipeSheet(); }
+    else if(act==="versionRestore") restoreVersion(id);
+    else if(act==="recipeAi"){ rOpen = {id:rOpen.id, mode:"ai", aiMode:"check", data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id))}; renderRecipeSheet(); }
+    else if(act==="aiWish"){ const i = $("aiWish"); if(i){ const v = b.dataset.v, cur = i.value.trim(); i.value = cur ? (cur.split(/,\s*/).includes(v) ? cur : cur+", "+v) : v; rOpen.wish = i.value; i.focus(); } }
     else if(act==="recipeDelete"){ const r = S.recipes.find(x=>x.id===rOpen.id); if(r && confirm(L("„"+r.title+"“ aus der Rezeptdatenbank löschen?","Delete “"+r.title+"” from the recipe database?"))) save(()=>db.doc("recipes/"+r.id).delete(), L("Rezept gelöscht","Recipe deleted")).then(ok=>{ if(ok) closeRecipe(); }); }
     else if(act==="lang"){ const v = b.dataset.v; if(v!==LANG) save(()=>db.doc("plan/settings").set(Object.assign({}, S.settings||{}, {language:v}))).then(ok=>{ if(ok) setLang(v); }); }
     else if(act==="importReview") reviewImport(id, +b.dataset.i);
@@ -1198,10 +1288,14 @@ h2{font-size:1.15rem;font-weight:700}
   });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if(rOpen) closeRecipe(); else if(openId) closeSheet(); } });
   $("rscrim").addEventListener("click", closeRecipe);
+  document.addEventListener("change", e=>{
+    if(e.target.name==="aiMode" && rOpen && rOpen.mode==="ai"){ const w = $("aiWish"); if(w) rOpen.wish = w.value; rOpen.aiMode = e.target.value; renderRecipeSheet(); }
+  });
   document.addEventListener("submit", e=>{
     if(e.target.id==="toolForm"){ e.preventDefault(); runTool(e.submitter); }
     else if(e.target.id==="photoForm"){ e.preventDefault(); uploadPhotos(e.target); }
-    else if(e.target.id==="recipeForm"){ e.preventDefault(); saveRecipeForm(e.target); }
+    else if(e.target.id==="recipeForm"){ e.preventDefault(); saveRecipeForm(e.target, e.submitter && e.submitter.value==="new"); }
+    else if(e.target.id==="aiReviewForm"){ e.preventDefault(); if(!rOpen.busy) aiReview(e.target); }
     else if(e.target.id==="scheduleForm"){ e.preventDefault(); scheduleRecipe($("scheduleDate").value); }
     else if(e.target.id==="recipeSearchForm"){ e.preventDefault(); }
   });
