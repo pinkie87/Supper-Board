@@ -136,7 +136,7 @@ podman build -t localhost/supper-board:latest -f Containerfile .
 systemctl --user restart supper-board
 ```
 
-**If something goes wrong:** `journalctl --user -u supper-board -f` shows the server log. Backups, compose instead of systemd and access from outside your home network are covered in [docs/en/setup-fedora.md](docs/en/setup-fedora.md). Further guides: [Home Assistant](docs/en/home-assistant.md), [AI setup](docs/en/ai.md), [data model](docs/en/data-model.md), [kitchen tablet](docs/en/kitchen-tablet.md).
+**If something goes wrong:** `journalctl --user -u supper-board -f` shows the server log. If it says `Address already in use`, port 8080 is taken by another service; see [Port 8080 already in use](docs/en/setup-fedora.md#port-8080-already-in-use). Backups, compose instead of systemd and access from outside your home network are covered in [docs/en/setup-fedora.md](docs/en/setup-fedora.md). Further guides: [Home Assistant](docs/en/home-assistant.md), [AI setup](docs/en/ai.md), [data model](docs/en/data-model.md), [kitchen tablet](docs/en/kitchen-tablet.md).
 
 ### Development
 
@@ -296,7 +296,7 @@ podman build -t localhost/supper-board:latest -f Containerfile .
 systemctl --user restart supper-board
 ```
 
-**Wenn etwas nicht klappt:** `journalctl --user -u supper-board -f` zeigt die Meldungen des Servers. Datensicherung, compose statt systemd und Zugriff von unterwegs stehen in [docs/einrichtung-fedora.md](docs/einrichtung-fedora.md).
+**Wenn etwas nicht klappt:** `journalctl --user -u supper-board -f` zeigt die Meldungen des Servers. Steht dort `Address already in use`, belegt ein anderer Dienst Port 8080; siehe [Port 8080 schon belegt](docs/einrichtung-fedora.md#port-8080-schon-belegt). Datensicherung, compose statt systemd und Zugriff von unterwegs stehen in [docs/einrichtung-fedora.md](docs/einrichtung-fedora.md).
 
 Weitere Anleitungen:
 

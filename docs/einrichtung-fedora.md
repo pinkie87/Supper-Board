@@ -91,6 +91,39 @@ systemctl --user restart supper-board
 journalctl --user -u supper-board -f
 ```
 
+## Port 8080 schon belegt
+
+Läuft auf dem Server schon ein anderer Dienst auf Port 8080 (z. B. die Weboberfläche von qBittorrent), startet der Container nicht. Der Dienst beendet sich gleich wieder, und systemd gibt nach einigen Versuchen auf. In `journalctl --user -u supper-board` steht dann:
+
+```
+Listen failed for HOST TCP port */8080: Address already in use
+```
+
+Wer den Port belegt, zeigt:
+
+```bash
+sudo ss -ltnp 'sport = :8080'
+```
+
+So weicht das Board auf einen anderen Port aus, hier 8081:
+
+1. In `~/.config/containers/systemd/supper-board.container` die Zeile auf `PublishPort=8081:8080` ändern. Nur die linke Zahl (Port auf dem Server) ändert sich; die rechte ist der Port im Container und bleibt 8080.
+2. In `~/supper-board/.env` die Adresse anpassen, damit die Links in den Benachrichtigungen stimmen: `SB_PUBLIC_URL=http://<Server-IP>:8081`.
+3. Dienst neu laden und starten:
+
+   ```bash
+   systemctl --user daemon-reload
+   systemctl --user reset-failed supper-board
+   systemctl --user start supper-board
+   curl http://localhost:8081/api/health
+   ```
+
+4. Falls die Firewall nur einzelne Ports durchlässt: `sudo firewall-cmd --permanent --add-port=8081/tcp && sudo firewall-cmd --reload`.
+
+Bei compose statt Quadlet ändert man in `compose.yaml` die Zeile unter `ports` auf `"8081:8080"`.
+
+Beim Aktualisieren die `.container`-Datei nicht erneut aus `deploy/` kopieren, sonst steht der Port wieder auf 8080.
+
 ## Datensicherung
 
 Alle Daten liegen in einer SQLite-Datei im Podman-Volume `supper-board-data`.
