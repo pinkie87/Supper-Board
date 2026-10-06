@@ -2,7 +2,7 @@
 
 # Küchen-Tablet
 
-Ab einer Bildschirmbreite von **960 Pixeln** zeigt das Board eine dreispaltige Küchenansicht: heute, die kommenden Tage sowie nächster Einkauf und Gefrierschrank. Ein 10-Zoll-Tablet im Querformat reicht dafür; ein 8-Zoll-Tablet zeigt die Handy-Ansicht.
+Ab einer Bildschirmbreite von **960 Pixeln** zeigt das Board eine dreispaltige Küchenansicht: heute, die kommenden Tage sowie nächster Einkauf und Bestand (auch direkt dort eintragen und ändern). Ein 10-Zoll-Tablet im Querformat reicht dafür; ein 8-Zoll-Tablet zeigt die Handy-Ansicht.
 
 ## Geräte
 

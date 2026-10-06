@@ -78,6 +78,12 @@ h2{font-size:1.15rem;font-weight:700}
 .addform{display:flex;gap:8px}
 .addform input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;min-height:44px}
 .addform input::placeholder{color:var(--muted)}
+.stockadd{flex-wrap:wrap}
+.stockadd input[name=name]{flex:1 1 100%}
+.stockadd input[name=amount]{flex:1 1 90px}
+.stockadd input[name=location]{flex:2 1 130px}
+.list .tag.warn{color:var(--danger)}
+.stock-edit{display:flex;flex-direction:column;gap:8px;width:100%;padding:6px 6px 6px 0}
 
 /* stars */
 .stars{display:inline-flex;gap:2px}
@@ -299,8 +305,14 @@ h2{font-size:1.15rem;font-weight:700}
           <div id="nextListWide"></div>
         </div>
         <div class="section">
-          <div class="section-head"><h2>Im Gefrierschrank</h2></div>
-          <div id="freezerWide"></div>
+          <div class="section-head"><h2>Bestand</h2></div>
+          <div id="stockWide" class="stack"></div>
+          <form class="addform stockadd js-add-stock" autocomplete="off">
+            <input name="name" type="text" placeholder="z. B. Hähnchenschenkel" aria-label="Neu im Bestand">
+            <input name="amount" type="text" placeholder="Menge" aria-label="Menge">
+            <input name="location" type="text" list="stockLocs" placeholder="Lagerort" aria-label="Lagerort">
+            <button class="btn ghost" type="submit">Hinzufügen</button>
+          </form>
         </div>
         <p class="cycle" id="cycleWide"></p>
       </div>
@@ -340,12 +352,16 @@ h2{font-size:1.15rem;font-weight:700}
       </form>
     </div>
     <div class="section">
-      <div class="section-head"><h2>Im Gefrierschrank</h2></div>
-      <div id="freezerDyn"></div>
-      <form class="addform" id="freezerForm" autocomplete="off">
-        <input id="addFreezer" type="text" placeholder="z. B. Hähnchenschenkel, ca. 1 kg" aria-label="Neu im Gefrierschrank">
+      <div class="section-head"><h2>Bestand</h2></div>
+      <p class="muted" style="margin:0;font-size:.92rem">Was zu Hause lagert – im Gefrierschrank, Kühlschrank, Vorratsschrank oder an einem eigenen Ort. Wird beim Planen zuerst verbraucht.</p>
+      <div id="stockDyn" class="stack"></div>
+      <form class="addform stockadd js-add-stock" autocomplete="off">
+        <input name="name" type="text" placeholder="z. B. Hähnchenschenkel" aria-label="Neu im Bestand">
+        <input name="amount" type="text" placeholder="Menge" aria-label="Menge">
+        <input name="location" type="text" list="stockLocs" placeholder="Lagerort" aria-label="Lagerort">
         <button class="btn ghost" type="submit">Hinzufügen</button>
       </form>
+      <datalist id="stockLocs"></datalist>
     </div>
   </section>
 
@@ -491,6 +507,7 @@ h2{font-size:1.15rem;font-weight:700}
   const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3.2 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.2l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>';
   const SNOW = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 2 3-2M9 20l3-2 3 2"/></svg>';
+  const PEN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
   const X = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
   const KIND = () => L({cook:"Kochen",leftovers:"Reste",flex:"Flexibel"},{cook:"Cook night",leftovers:"Leftovers",flex:"Flexible"});
 
@@ -697,7 +714,7 @@ h2{font-size:1.15rem;font-weight:700}
   }
 
   function renderShop(){
-    if(dbState==="none"){ ["nextList","staplesDyn","freezerDyn"].forEach(i=>$(i).innerHTML=""); return; }
+    if(dbState==="none"){ ["nextList","staplesDyn","stockDyn","stockWide"].forEach(i=>$(i).innerHTML=""); return; }
     if(dbState==="pending"){ $("nextList").innerHTML = '<div class="empty">'+L('Lade die Liste …','Loading the list …')+'</div>'; return; }
     const sh = statusHtml("shop"); $("shopStatus").innerHTML = sh; $("shopStatus").hidden = !sh;
     const d = S.dplan;
@@ -725,11 +742,60 @@ h2{font-size:1.15rem;font-weight:700}
         '<button type="button" class="low'+(s.status==="low"?" on":"")+'" data-act="staple" data-id="'+esc(s.id)+'" data-v="low" aria-pressed="'+(s.status==="low")+'">'+L('Knapp','Low')+'</button></span><button type="button" class="iconbtn" data-act="delStaple" data-id="'+esc(s.id)+'" aria-label="'+L('Aus dem Vorrat entfernen: ','Remove from pantry: ')+esc(s.name)+'">'+X+'</button></li>').join("")+'</ul></div>').join("")
       : '<div class="empty">'+L('Noch kein Vorrat eingetragen.','No staples yet.')+'</div>';
     $("nextListWide").innerHTML = $("nextList").innerHTML;
-    const fz = S.freezer.slice().sort((a,b)=>(a.at||"")<(b.at||"")?-1:1);
-    $("freezerDyn").innerHTML = fz.length
-      ? '<ul class="list">'+fz.map(f=>'<li><span class="txt">'+esc(f.name)+(f.forMeal?' <span class="tag">· '+esc(f.forMeal)+'</span>':'')+'</span><button type="button" class="btn small ghost" data-act="delFreezer" data-id="'+esc(f.id)+'">'+L('Verbraucht','Used')+'</button></li>').join("")+'</ul>'
-      : '<div class="empty">'+L('Der Gefrierschrank ist leer.','The freezer is empty.')+'</div>';
-    $("freezerWide").innerHTML = $("freezerDyn").innerHTML;
+    renderStock();
+  }
+
+  // ---------- Bestand (Sammlung "freezer", mit Lagerort) ----------
+  // Feste Lagerorte werden als Schlüssel gespeichert, damit sie in beiden Sprachen passen.
+  const STOCK_LOCS = ["freezer","fridge","pantry","cellar"];
+  const locNames = k => ({freezer:["Gefrierschrank","Freezer"], fridge:["Kühlschrank","Fridge"], pantry:["Vorratsschrank","Pantry"], cellar:["Keller","Cellar"]})[k];
+  const locLabel = k => { const n = locNames(k||"freezer"); return n ? L(n[0], n[1]) : k; };
+  function locKey(text){
+    const t = String(text||"").trim(); if(!t) return "";
+    const low = t.toLowerCase();
+    return STOCK_LOCS.find(k=>k===low || locNames(k).some(n=>n.toLowerCase()===low)) || t;
+  }
+  function lastLoc(){ try{ return localStorage.getItem("sb-stock-loc") || "freezer"; }catch(e){ return "freezer"; } }
+  let stockEdit = null;      // {id, name, amount, location, best} – Entwurf, übersteht Live-Updates
+  function bestTag(best){
+    if(!best) return "";
+    const days = Math.round((new Date(best+"T12:00") - new Date(today()+"T12:00")) / 864e5);
+    const txt = L("MHD ","Best before ")+fmt(best,{day:"numeric",month:"numeric"});
+    return ' <span class="tag'+(days<=3?' warn':'')+'">· '+esc(days<0 ? L("abgelaufen ","expired ")+fmt(best,{day:"numeric",month:"numeric"}) : txt)+'</span>';
+  }
+  function renderStock(){
+    const groups = {};
+    S.freezer.forEach(f=>{ const k = f.location || "freezer"; (groups[k] = groups[k] || []).push(f); });
+    const custom = Object.keys(groups).filter(k=>!STOCK_LOCS.includes(k)).sort((a,b)=>a.localeCompare(b));
+    const order = STOCK_LOCS.filter(k=>groups[k]).concat(custom);
+    const field = (label, name, val, type, extra) => '<label class="field">'+label+'<input name="'+name+'" type="'+(type||"text")+'" value="'+esc(val||"")+'"'+(extra||"")+'></label>';
+    const item = f => {
+      if(stockEdit && stockEdit.id===f.id){
+        const e = stockEdit;
+        return '<li><form class="stock-edit js-edit-stock" data-id="'+esc(f.id)+'" autocomplete="off">'+
+          field(L('Was','What'), "name", e.name, "text", " required")+
+          '<div class="fields2">'+field(L('Menge','Amount'), "amount", e.amount)+field(L('Lagerort','Location'), "location", e.location, "text", ' list="stockLocs"')+
+          field(L('Haltbar bis (optional)','Best before (optional)'), "best", e.best, "date")+'</div>'+
+          '<div class="row-btns"><button class="btn small" type="submit">'+L('Speichern','Save')+'</button><button class="btn small ghost" type="button" data-act="stockEditCancel">'+L('Abbrechen','Cancel')+'</button></div></form></li>';
+      }
+      return '<li><span class="txt">'+esc(f.name)+(f.amount?' <span class="muted">· '+esc(f.amount)+'</span>':'')+
+        (f.forMeal?' <span class="tag">· '+esc(f.forMeal)+'</span>':'')+bestTag(f.best)+'</span>'+
+        '<button type="button" class="iconbtn" data-act="stockEdit" data-id="'+esc(f.id)+'" aria-label="'+L('Ändern: ','Edit: ')+esc(f.name)+'">'+PEN+'</button>'+
+        '<button type="button" class="btn small ghost" data-act="delFreezer" data-id="'+esc(f.id)+'">'+L('Verbraucht','Used')+'</button></li>';
+    };
+    const sortItems = a => a.slice().sort((x,y)=>(x.best||"9999")<(y.best||"9999")?-1:(x.best||"9999")>(y.best||"9999")?1:(x.at||"")<(y.at||"")?-1:1);
+    const html = order.length ? order.map(k=>'<div class="stack" style="gap:6px"><span class="eyebrow">'+esc(locLabel(k))+'</span><ul class="list">'+sortItems(groups[k]).map(item).join("")+'</ul></div>').join("")
+      : '<div class="empty">'+L('Noch nichts im Bestand.','Nothing in stock yet.')+'</div>';
+    // Nur eine Ansicht bekommt das Bearbeiten-Formular, sonst gäbe es zwei gleiche Formulare
+    const wideOnly = matchMedia("(min-width:960px)").matches && tab==="today";
+    const stripped = html.replace(/<li><form class="stock-edit[\s\S]*?<\/form><\/li>/, "");
+    $("stockDyn").innerHTML = wideOnly ? stripped : html;
+    $("stockWide").innerHTML = wideOnly ? html : stripped;
+    $("stockLocs").innerHTML = STOCK_LOCS.concat(custom).map(k=>'<option value="'+esc(locLabel(k))+'">').join("");
+    const defaults = STOCK_LOCS.flatMap(k=>locNames(k));
+    document.querySelectorAll('.js-add-stock input[name=location]').forEach(i=>{
+      if(document.activeElement!==i && (!i.value || defaults.includes(i.value))) i.value = locLabel(lastLoc());
+    });
   }
 
   function renderFeedback(){
@@ -1192,7 +1258,7 @@ h2{font-size:1.15rem;font-weight:700}
     tab = t;
     ["today","plan","shop","feedback","recipes"].forEach(x=>{ $("v-"+x).hidden = x!==t; });
     document.querySelectorAll(".nav button").forEach(b=>{ if(b.dataset.tab===t) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
-    renderHeader(); window.scrollTo(0,0);
+    renderHeader(); if(stockEdit) renderStock(); window.scrollTo(0,0);
     try{ history.replaceState(null,"","#"+t); }catch(e){}
   }
   function openSheet(id){ openId = id; $("scrim").hidden = false; $("sheet").hidden = false; $("noteInput").value = ""; renderSheet(); $("sheet").scrollTop = 0; }
@@ -1255,7 +1321,9 @@ h2{font-size:1.15rem;font-weight:700}
     else if(act==="delNote") save(()=>db.doc("notes/"+id).delete(), L("Notiz gelöscht","Note deleted"));
     else if(act==="delGrocery") save(()=>db.doc("grocery/"+id).delete());
     else if(act==="staple") save(()=>db.doc("staples/"+id).update({status:b.dataset.v}));
-    else if(act==="delFreezer") save(()=>db.doc("freezer/"+id).delete(), L("Aus dem Gefrierschrank entfernt","Removed from the freezer"));
+    else if(act==="delFreezer") save(()=>db.doc("freezer/"+id).delete(), L("Aus dem Bestand entfernt","Removed from stock"));
+    else if(act==="stockEdit"){ const f = S.freezer.find(x=>x.id===id); if(f){ stockEdit = {id, name:f.name||"", amount:f.amount||"", location:locLabel(f.location), best:f.best||""}; renderStock(); const i = Array.from(document.querySelectorAll('.js-edit-stock input[name=name]')).find(x=>x.offsetParent); if(i) i.focus(); } }
+    else if(act==="stockEditCancel"){ stockEdit = null; renderStock(); }
     else if(act==="delIdea") save(()=>db.doc("ideas/"+id).delete());
     else if(act==="delStaple") save(()=>db.doc("staples/"+id).delete());
     else if(act==="draftNow" || act==="listNow"){
@@ -1295,6 +1363,12 @@ h2{font-size:1.15rem;font-weight:700}
     if(e.target.id==="toolForm"){ e.preventDefault(); runTool(e.submitter); }
     else if(e.target.id==="photoForm"){ e.preventDefault(); uploadPhotos(e.target); }
     else if(e.target.id==="recipeForm"){ e.preventDefault(); saveRecipeForm(e.target, e.submitter && e.submitter.value==="new"); }
+    else if(e.target.classList.contains("js-edit-stock")){
+      e.preventDefault(); const f = e.target, id = f.dataset.id, name = f.elements.name.value.trim(); if(!name) return;
+      const data = {name, amount:f.elements.amount.value.trim(), location:locKey(f.elements.location.value) || "freezer", best:f.elements.best.value};
+      ["amount","best"].forEach(k=>{ if(!data[k]) data[k] = {__delete__:true}; });
+      save(()=>db.doc("freezer/"+id).update(data), L("Gespeichert","Saved")).then(ok=>{ if(ok){ stockEdit = null; renderStock(); } });
+    }
     else if(e.target.id==="aiReviewForm"){ e.preventDefault(); if(!rOpen.busy) aiReview(e.target); }
     else if(e.target.id==="scheduleForm"){ e.preventDefault(); scheduleRecipe($("scheduleDate").value); }
     else if(e.target.id==="recipeSearchForm"){ e.preventDefault(); }
@@ -1324,9 +1398,19 @@ h2{font-size:1.15rem;font-weight:700}
     e.preventDefault(); const text = $("addIdea").value.trim(); if(!text) return;
     if(await save(()=>db.collection("ideas").add({text, at:new Date().toISOString()}), L("Wunsch gespeichert","Request saved"))) $("addIdea").value = "";
   });
-  $("freezerForm").addEventListener("submit", async e=>{
-    e.preventDefault(); const name = $("addFreezer").value.trim(); if(!name) return;
-    if(await save(()=>db.collection("freezer").add({name, at:new Date().toISOString()}), L("Im Gefrierschrank vermerkt","Added to the freezer"))) $("addFreezer").value = "";
+  document.querySelectorAll(".js-add-stock").forEach(f=>f.addEventListener("submit", async e=>{
+    e.preventDefault();
+    const name = f.elements.name.value.trim(), amount = f.elements.amount.value.trim(), location = locKey(f.elements.location.value) || "freezer";
+    if(!name) return;
+    const doc = {name, location, at:new Date().toISOString()}; if(amount) doc.amount = amount;
+    if(await save(()=>db.collection("freezer").add(doc), L("Im Bestand vermerkt: ","Added to stock: ")+locLabel(location))){
+      try{ localStorage.setItem("sb-stock-loc", location); }catch(err){}
+      f.elements.name.value = ""; f.elements.amount.value = ""; f.elements.name.focus();
+    }
+  }));
+  document.addEventListener("input", e=>{
+    const f = e.target.form;
+    if(f && f.classList.contains("js-edit-stock") && stockEdit && e.target.name in stockEdit) stockEdit[e.target.name] = e.target.value;
   });
 
   // Feste Texte im HTML: deutsch im Markup, englisch aus dieser Tabelle
@@ -1337,14 +1421,15 @@ h2{font-size:1.15rem;font-weight:700}
     "z. B. Eier, Kaffee, Küchenrolle":"e.g. eggs, coffee, paper towels",
     "Artikel für die nächste Einkaufsliste":"Item for the next shopping list",
     "Hinzufügen":"Add", "Demnächst":"Coming up", "Nächster Einkauf":"Next shop", "Artikel hinzufügen":"Add an item",
-    "Im Gefrierschrank":"In the freezer",
+    "Bestand":"Stock",
+    "Was zu Hause lagert – im Gefrierschrank, Kühlschrank, Vorratsschrank oder an einem eigenen Ort. Wird beim Planen zuerst verbraucht.":"What you keep at home – in the freezer, fridge, pantry or a place of your own. Used up first when planning.",
+    "z. B. Hähnchenschenkel":"e.g. chicken thighs", "Neu im Bestand":"New in stock", "Menge":"Amount", "Lagerort":"Location",
     "Alles hier kommt zusammen mit dem Einkauf für den neuen Plan auf die nächste Einkaufsliste.":"Everything here goes on the next shopping list together with the new plan’s groceries.",
     "Einkauf für den nächsten Plan":"Groceries for the next plan",
     "Vor dem Einkauf wird daraus zusammen mit der Liste oben eine gemeinsame Einkaufsliste.":"Before shopping, these are combined with the list above into one shopping list.",
     "Ganze Einkaufsliste kopieren":"Copy full shopping list", "Grundvorrat":"Pantry staples",
     "Was knapp ist, kommt automatisch auf die nächste Einkaufsliste.":"Anything marked low goes on the next shopping list automatically.",
     "z. B. Kaffee oder „Gewürze: Zimt“":"e.g. coffee or “Spices: cinnamon”", "Zum Grundvorrat hinzufügen":"Add to pantry staples",
-    "z. B. Hähnchenschenkel, ca. 1 kg":"e.g. chicken thighs, approx. 1 kg", "Neu im Gefrierschrank":"New in the freezer",
     "Wünsche für den nächsten Plan":"Requests for the next plan",
     "Gerichte zum Ausprobieren, was weg soll, volle Abende. Wird vor jedem neuen Plan gelesen.":"Meals to try, things to skip, busy nights. Read before every new plan.",
     "z. B. mehr Fisch, dienstags nichts Scharfes":"e.g. more fish, nothing spicy on Tuesdays", "Wunsch für den nächsten Plan":"Request for the next plan",

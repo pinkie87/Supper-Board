@@ -65,7 +65,7 @@ Die Bewertung eines Rezepts ergibt sich aus allen Gerichten mit passender `recip
 | `ideas` | `{text, at}` – Wünsche für den nächsten Plan |
 | `grocery` | `{text, at}` – Zusätze für den nächsten Einkauf |
 | `staples` | `{name, group, status, order}` – Grundvorrat, `status`: `have`, `low` oder `unknown` |
-| `freezer` | `{name, forMeal, at}` – Gefrierschrankinhalt |
+| `freezer` | `{name, amount, location, best, forMeal, at}` – Bestand (der Name stammt noch aus der Zeit, als es nur den Gefrierschrank gab). `location` ist `freezer`, `fridge`, `pantry`, `cellar` oder ein eigener Ortsname; fehlt es, gilt Gefrierschrank. `best` = haltbar bis (JJJJ-MM-TT), optional. |
 | `imports` | `{state, images, recipes, message, order, createdAt}` – Foto-Import: `state` ist `waiting`, `working`, `done` oder `error`; `recipes` sind die erkannten, noch nicht geprüften Rezepte. Die Fotos liegen in `uploads/`. |
 | `recipe_versions` | `{recipe, version, note, at, data}` – frühere Fassungen eines Rezepts (`data` = Rezeptfelder), höchstens 30 pro Rezept |
 
