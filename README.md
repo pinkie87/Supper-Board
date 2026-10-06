@@ -58,19 +58,82 @@ flowchart LR
 - **AI** (optional): with `LLM_PROVIDER=claude`, requests, ratings, pantry and recipe titles go to the Anthropic API when planning. With `ollama`, everything stays on your network. With `none`, plans are built from your recipe database.
 - **REWE:** REWE has no public ordering API, so the board produces a ready-to-paste list; each item in the plan's groceries also links to a search in the REWE online shop. Other supermarkets can be set in `.env`.
 
-### Quick start
+### Installation on a Fedora server
 
-On the Fedora server:
+Run these steps on the server as a regular user, not as root. Other Linux distributions with Podman or Docker work the same way; only the package installation differs.
+
+**1. Install the tools**
+
+```bash
+sudo dnf install -y podman git
+```
+
+**2. Get the project and configure it**
 
 ```bash
 git clone https://github.com/pinkie87/Supper-Board.git ~/supper-board
 cd ~/supper-board
-cp .env.example .env        # adjust settings, at least SB_PASSWORD
-podman build -t localhost/supper-board:latest -f Containerfile .
-podman run -d --name supper-board -p 8080:8080 --env-file .env -v supper-board-data:/data localhost/supper-board:latest
+cp .env.example .env
+nano .env
 ```
 
-Then open `http://<server>:8080`. Running it as a systemd service, firewall, updates and backups are covered in [docs/einrichtung-fedora.md](docs/einrichtung-fedora.md). Further guides (in German): [Home Assistant](docs/home-assistant.md), [AI setup](docs/ki.md), [data model](docs/datenmodell.md), [kitchen tablet](docs/kuechen-tablet.md).
+Set at least these values in `.env`:
+
+- `SB_PASSWORD` – a password for the board (the browser asks once; any user name works)
+- `SB_PUBLIC_URL` – the server's address, e.g. `http://192.168.1.50:8080`
+- `LLM_PROVIDER` – start with `none`; later `claude` (plus `ANTHROPIC_API_KEY`) or `ollama`, see [docs/ki.md](docs/ki.md)
+- Leave the Home Assistant settings empty for now; see [docs/home-assistant.md](docs/home-assistant.md)
+- Using a store other than REWE: change `SB_STORE_NAME`, `SB_STORE_URL` and `SB_STORE_SEARCH_URL`
+
+**3. Build the container** (takes a few minutes the first time)
+
+```bash
+podman build -t localhost/supper-board:latest -f Containerfile .
+```
+
+**4. Set it up as a service that starts automatically**
+
+```bash
+mkdir -p ~/.config/containers/systemd
+cp deploy/supper-board.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user start supper-board
+sudo loginctl enable-linger $USER
+```
+
+The last command keeps the service running after a reboot, even when you're not logged in. The service reads its settings from `~/supper-board/.env`; if you cloned somewhere else, adjust `EnvironmentFile=` in the `.container` file.
+
+**5. Open the firewall**
+
+```bash
+sudo firewall-cmd --permanent --add-port=8080/tcp
+sudo firewall-cmd --reload
+```
+
+**6. Check that it runs**
+
+```bash
+systemctl --user status supper-board
+curl http://localhost:8080/api/health
+```
+
+If you get `{"ok":true}`, open `http://<server-ip>:8080` on your phone, log in with the password and add the page to your home screen via the browser menu.
+
+**7. First steps in the board**
+
+1. Under "Feedback", adjust the dietary guidelines.
+2. Under "Rezepte", add a few recipes (without AI, plans are built from them).
+3. Under "Plan", tap "Ersten Plan erstellen".
+
+**Updating**
+
+```bash
+cd ~/supper-board && git pull
+podman build -t localhost/supper-board:latest -f Containerfile .
+systemctl --user restart supper-board
+```
+
+**If something goes wrong:** `journalctl --user -u supper-board -f` shows the server log. Backups, compose instead of systemd and access from outside your home network are covered in [docs/einrichtung-fedora.md](docs/einrichtung-fedora.md). Further guides (in German): [Home Assistant](docs/home-assistant.md), [AI setup](docs/ki.md), [data model](docs/datenmodell.md), [kitchen tablet](docs/kuechen-tablet.md).
 
 ### Development
 
@@ -152,19 +215,82 @@ flowchart LR
 - **KI** (optional): Mit `LLM_PROVIDER=claude` gehen beim Planen Wünsche, Bewertungen, Vorrat und Rezepttitel an die Anthropic-API. Mit `ollama` bleibt alles im Heimnetz. Mit `none` werden Pläne aus eurer Rezeptdatenbank zusammengestellt.
 - **REWE:** REWE hat keine öffentliche Schnittstelle zum Bestellen. Das Board erstellt daher eine fertige Liste zum Kopieren; jeder Artikel im Plan-Einkauf ist außerdem ein Link auf die Suche im REWE-Shop. Andere Supermärkte lassen sich in der `.env` eintragen.
 
-### Schnellstart
+### Installation auf einem Fedora-Server
 
-Auf dem Fedora-Server:
+Die Schritte auf dem Server als normaler Benutzer ausführen, nicht als root. Andere Linux-Distributionen mit Podman oder Docker funktionieren genauso, nur die Paketinstallation unterscheidet sich.
+
+**1. Programme installieren**
+
+```bash
+sudo dnf install -y podman git
+```
+
+**2. Projekt holen und einstellen**
 
 ```bash
 git clone https://github.com/pinkie87/Supper-Board.git ~/supper-board
 cd ~/supper-board
-cp .env.example .env        # Einstellungen anpassen, mindestens SB_PASSWORD
-podman build -t localhost/supper-board:latest -f Containerfile .
-podman run -d --name supper-board -p 8080:8080 --env-file .env -v supper-board-data:/data localhost/supper-board:latest
+cp .env.example .env
+nano .env
 ```
 
-Dann `http://<server>:8080` öffnen. Für den Dauerbetrieb als systemd-Dienst, Firewall, Updates und Backups: **[docs/einrichtung-fedora.md](docs/einrichtung-fedora.md)**.
+In der `.env` mindestens diese Werte setzen:
+
+- `SB_PASSWORD` – ein Passwort für das Board (der Browser fragt einmal danach, der Benutzername ist egal)
+- `SB_PUBLIC_URL` – die Adresse des Servers, z. B. `http://192.168.1.50:8080`
+- `LLM_PROVIDER` – zum Start `none`; später `claude` (mit `ANTHROPIC_API_KEY`) oder `ollama`, siehe [docs/ki.md](docs/ki.md)
+- Home Assistant erst mal leer lassen, siehe [docs/home-assistant.md](docs/home-assistant.md)
+- Anderer Supermarkt als REWE: `SB_STORE_NAME`, `SB_STORE_URL` und `SB_STORE_SEARCH_URL` anpassen
+
+**3. Container bauen** (dauert beim ersten Mal ein paar Minuten)
+
+```bash
+podman build -t localhost/supper-board:latest -f Containerfile .
+```
+
+**4. Als Dienst einrichten, der automatisch startet**
+
+```bash
+mkdir -p ~/.config/containers/systemd
+cp deploy/supper-board.container ~/.config/containers/systemd/
+systemctl --user daemon-reload
+systemctl --user start supper-board
+sudo loginctl enable-linger $USER
+```
+
+Der letzte Befehl sorgt dafür, dass der Dienst auch nach einem Neustart läuft, ohne dass jemand angemeldet ist. Der Dienst liest die Einstellungen aus `~/supper-board/.env`; liegt das Projekt woanders, `EnvironmentFile=` in der `.container`-Datei anpassen.
+
+**5. Firewall öffnen**
+
+```bash
+sudo firewall-cmd --permanent --add-port=8080/tcp
+sudo firewall-cmd --reload
+```
+
+**6. Prüfen, ob es läuft**
+
+```bash
+systemctl --user status supper-board
+curl http://localhost:8080/api/health
+```
+
+Kommt `{"ok":true}` zurück, auf dem Handy `http://<Server-IP>:8080` öffnen, mit dem Passwort anmelden und über das Browser-Menü „Zum Startbildschirm hinzufügen“.
+
+**7. Erste Schritte im Board**
+
+1. Unter „Feedback“ die Ernährungsrichtlinien anpassen.
+2. Unter „Rezepte“ ein paar Rezepte anlegen (ohne KI wird der Plan daraus erstellt).
+3. Unter „Plan“ auf „Ersten Plan erstellen“ tippen.
+
+**Aktualisieren**
+
+```bash
+cd ~/supper-board && git pull
+podman build -t localhost/supper-board:latest -f Containerfile .
+systemctl --user restart supper-board
+```
+
+**Wenn etwas nicht klappt:** `journalctl --user -u supper-board -f` zeigt die Meldungen des Servers. Datensicherung, compose statt systemd und Zugriff von unterwegs stehen in [docs/einrichtung-fedora.md](docs/einrichtung-fedora.md).
 
 Weitere Anleitungen:
 
