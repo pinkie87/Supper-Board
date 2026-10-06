@@ -1,0 +1,24 @@
+# Podman-Quadlet für Fedora: startet Supper Board als systemd-Dienst des Benutzers.
+# Ablegen unter ~/.config/containers/systemd/supper-board.container
+# Anleitung: docs/einrichtung-fedora.md
+
+[Unit]
+Description=Supper Board
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/supper-board:latest
+ContainerName=supper-board
+EnvironmentFile=%h/supper-board/.env
+PublishPort=8080:8080
+Volume=supper-board-data:/data
+HealthCmd=python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health')"
+HealthInterval=60s
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target
