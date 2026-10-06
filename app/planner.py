@@ -12,13 +12,13 @@ import random
 from datetime import date, datetime, timedelta
 from typing import Any, Awaitable, Callable
 
-from . import llm, notify
+from . import llm, notify, versions
 from .config import Settings
 from . import i18n
 from .i18n import T
 from .recipes import RECIPE_SCHEMA, clean_recipe
 from .units import UnitOptions
-from .store import Store
+from .store import Store, new_id
 
 log = logging.getLogger(__name__)
 
@@ -177,8 +177,10 @@ def save_meal_as_recipe(store: Store, meal: dict) -> str | None:
     if not meal.get("recipe") or meal.get("recipeId"):
         return meal.get("recipeId")
     recipe = clean_recipe({**meal["recipe"], "title": meal.get("title"), "description": meal.get("details")})
-    recipe.update(source=T("KI-Plan", "AI plan"), createdAt=datetime.now().isoformat(timespec="seconds"))
-    return store.add("recipes", recipe)
+    recipe.update(source=T("KI-Plan", "AI plan"), createdAt=versions.now())
+    recipe_id = new_id()
+    versions.save(store, recipe_id, recipe)
+    return recipe_id
 
 
 # ---------- Aufräumen: Entwurf wird zum aktiven Plan ----------

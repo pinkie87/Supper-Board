@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app import llm, versions
+from app import llm, planner, versions
 from app.main import create_app
 
 RECIPE = {"title": "Linsensuppe", "serves": 4, "ingredients": ["250 g rote Linsen", "1 Zwiebel"],
@@ -37,6 +37,33 @@ def test_versions_are_pruned(store, monkeypatch):
         versions.save(store, "r1", dict(RECIPE, title=f"Suppe {n}"))
     assert [v["version"] for v in versions.list_versions(store, "r1")] == [5, 4, 3]
     assert store.get("recipes", "r1")["version"] == 6
+
+
+def test_missing_and_empty_fields_are_the_same(store):
+    store.set("recipes", "r1", {k: v for k, v in RECIPE.items() if k != "tags"})  # älteres Rezept ohne Tags, ohne Tipp
+    saved = versions.save(store, "r1", dict(RECIPE, tip="", oven="", description=""))
+    assert saved["version"] == 1 and versions.list_versions(store, "r1") == []
+
+
+def test_restore_of_identical_version_is_recorded(store):
+    versions.save(store, "r1", dict(RECIPE))
+    versions.save(store, "r1", dict(RECIPE, title="Rote Linsensuppe"))
+    v1 = versions.list_versions(store, "r1")[0]
+    versions.restore(store, "r1", v1["id"])  # Version 3 = Inhalt von Version 1
+    again = versions.restore(store, "r1", v1["id"])
+    assert again["version"] == 4 and again["versionNote"] == "Version 1 wiederhergestellt"
+
+
+def test_timestamps_have_timezone(store):
+    saved = versions.save(store, "r1", dict(RECIPE))
+    assert saved["updatedAt"].endswith("+00:00")
+
+
+def test_meal_saved_as_recipe_gets_version(store):
+    meal = {"title": "Ofengemüse", "details": "", "recipe": {"serves": 2, "ingredients": ["1 Zucchini"], "steps": ["Backen."]}}
+    rid = planner.save_meal_as_recipe(store, meal)
+    doc = store.get("recipes", rid)
+    assert doc["version"] == 1 and doc["updatedAt"] and doc["createdAt"].endswith("+00:00")
 
 
 def test_api_versions_and_delete(settings):
