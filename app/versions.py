@@ -6,7 +6,7 @@ jederzeit zurücknehmen.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from .i18n import T
@@ -17,12 +17,14 @@ CONTENT = ("title", "description", "serves", "time", "oven", "ingredients", "ste
 META = ("version", "versionNote", "updatedAt")
 
 
-def _now() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+def now() -> str:
+    """Zeitpunkt in UTC mit Zeitzone, passend zu ``toISOString()`` im Board."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _content(doc: dict) -> dict:
-    return {k: doc.get(k) for k in CONTENT}
+    # Fehlende und leere Felder gelten als gleich (älteres Rezept ohne "tip" vs. leeres Formularfeld)
+    return {k: doc.get(k) or None for k in CONTENT}
 
 
 def snapshot(store: Store, recipe_id: str, old: dict) -> None:
@@ -30,7 +32,7 @@ def snapshot(store: Store, recipe_id: str, old: dict) -> None:
         "recipe": recipe_id,
         "version": old.get("version") or 1,
         "note": old.get("versionNote") or "",
-        "at": old.get("updatedAt") or old.get("createdAt") or _now(),
+        "at": old.get("updatedAt") or old.get("createdAt") or now(),
         "data": {k: v for k, v in old.items() if k not in META and k != "id"},
     })
     versions = list_versions(store, recipe_id)
@@ -44,18 +46,21 @@ def list_versions(store: Store, recipe_id: str) -> list[dict]:
     return sorted(found, key=lambda v: (v.get("version") or 0, v.get("at") or ""), reverse=True)
 
 
-def save(store: Store, recipe_id: str, data: dict[str, Any], note: str | None = None) -> dict:
-    """Rezept speichern; eine geänderte vorherige Fassung wird als Version abgelegt."""
+def save(store: Store, recipe_id: str, data: dict[str, Any], note: str | None = None, force: bool = False) -> dict:
+    """Rezept speichern; eine geänderte vorherige Fassung wird als Version abgelegt.
+
+    Mit ``force`` entsteht auch ohne inhaltliche Änderung eine neue Version (Wiederherstellen).
+    """
     data = {k: v for k, v in data.items() if k not in META and k not in ("id", "_col", "_note")}
     old = store.get("recipes", recipe_id)
     if old is None:
-        data.update(version=1, versionNote=note or T("Angelegt", "Created"), updatedAt=_now())
-    elif _content(old) == _content(data):
+        data.update(version=1, versionNote=note or T("Angelegt", "Created"), updatedAt=now())
+    elif not force and _content(old) == _content(data):
         data.update(version=old.get("version") or 1, versionNote=old.get("versionNote", ""),
-                    updatedAt=old.get("updatedAt") or _now())  # nichts Inhaltliches geändert
+                    updatedAt=old.get("updatedAt") or now())  # nichts Inhaltliches geändert
     else:
         snapshot(store, recipe_id, old)
-        data.update(version=(old.get("version") or 1) + 1, versionNote=note or T("Bearbeitet", "Edited"), updatedAt=_now())
+        data.update(version=(old.get("version") or 1) + 1, versionNote=note or T("Bearbeitet", "Edited"), updatedAt=now())
     if old is not None and "createdAt" in old and "createdAt" not in data:
         data["createdAt"] = old["createdAt"]
     store.set("recipes", recipe_id, data)
@@ -67,7 +72,7 @@ def restore(store: Store, recipe_id: str, version_id: str) -> dict | None:
     if not version or version.get("recipe") != recipe_id or store.get("recipes", recipe_id) is None:
         return None
     note = T(f"Version {version.get('version')} wiederhergestellt", f"Restored version {version.get('version')}")
-    return save(store, recipe_id, dict(version.get("data") or {}), note)
+    return save(store, recipe_id, dict(version.get("data") or {}), note, force=True)
 
 
 def delete_all(store: Store, recipe_id: str) -> None:

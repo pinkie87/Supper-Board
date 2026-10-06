@@ -1062,7 +1062,7 @@ h2{font-size:1.15rem;font-weight:700}
     if(rOpen.mode==="versions"){
       const cur = S.recipes.find(x=>x.id===rOpen.id) || r;
       const vs = rOpen.versions;
-      const when = v => v ? fmt(String(v).slice(0,10),{day:"numeric",month:"numeric",year:"numeric"}) : "";
+      const when = v => v ? new Date(v).toLocaleDateString(LOC(),{day:"numeric",month:"numeric",year:"numeric"}) : "";
       const item = (v, current) => '<li><div class="vh">Version '+esc(v.version||1)+(current?' · '+L('aktuell','current'):'')+'</div>'+
         '<div class="muted" style="font-size:.88rem">'+[when(current?v.updatedAt||v.createdAt:v.at), esc(current?v.versionNote||"":v.note||"")].filter(Boolean).join(" · ")+'</div>'+
         (current?'':'<div class="row-btns"><button type="button" class="btn small ghost" data-act="versionShow" data-id="'+esc(v.id)+'">'+(rOpen.show===v.id?L('Ausblenden','Hide'):L('Ansehen','View'))+'</button>'+
@@ -1104,7 +1104,7 @@ h2{font-size:1.15rem;font-weight:700}
       '<label class="field">'+L('Tags (mit Komma getrennt)','Tags (comma-separated)')+'<input name="tags" type="text" placeholder="'+L('vegetarisch, schnell','vegetarian, quick')+'" value="'+esc((r.tags||[]).join(", "))+'"></label>'+
       '<label class="field">'+L('Quelle','Source')+'<input name="source" type="text" value="'+esc(r.source||"")+'"></label>'+
       (rOpen.id?'<label class="field">'+L('Änderungsnotiz (optional)','Change note (optional)')+'<input name="note" type="text" maxlength="120" placeholder="'+L('z. B. weniger Salz','e.g. less salt')+'" value="'+esc(rOpen.note||"")+'"></label>':'')+
-      '<div class="row-btns"><button class="btn" type="submit">'+(rOpen.changes?L('Übernehmen','Apply'):L('Speichern','Save'))+'</button>'+
+      '<div class="row-btns"><button class="btn" type="submit">'+((rOpen.changes||[]).length?L('Übernehmen','Apply'):L('Speichern','Save'))+'</button>'+
         (rOpen.id?'<button class="btn ghost" type="submit" value="new">'+L('Als neues Rezept speichern','Save as new recipe')+'</button>':'')+
         '<button class="btn ghost" type="button" data-act="'+(rOpen.id?"recipeView":"recipeClose")+'">'+L('Abbrechen','Cancel')+'</button></div></form>'+
       (rOpen.importRef ? '<div class="stack" style="margin-top:16px"><span class="eyebrow">'+L('Foto zum Vergleich','Photo for comparison')+'</span>'+
@@ -1116,10 +1116,12 @@ h2{font-size:1.15rem;font-weight:700}
       title: String(f.get("title")||"").trim(), description: String(f.get("description")||"").trim(),
       serves: parseInt(f.get("serves"),10) || 0, time: String(f.get("time")||"").trim(), oven: String(f.get("oven")||"").trim(),
       ingredients: split(f.get("ingredients"), /\n/), steps: split(f.get("steps"), /\n/), tip: String(f.get("tip")||"").trim(),
-      tags: split(f.get("tags"), /,/), source: String(f.get("source")||"").trim() || L("eigenes Rezept","own recipe")
+      tags: split(f.get("tags"), /,/), source: String(f.get("source")||"").trim()
     };
     if(!data.title) return;
     const prev = rOpen.id ? S.recipes.find(r=>r.id===rOpen.id) : null;
+    // Ein Rezept ohne Quelle bleibt beim Bearbeiten ohne, sonst entstünde eine Version ohne Änderung.
+    if(!data.source && !(prev && !prev.source && !asNew)) data.source = L("eigenes Rezept","own recipe");
     const note = String(f.get("note")||"").trim();
     if(asNew && prev){
       if(data.title===prev.title) data.title += L(" (Variante)"," (variant)");
@@ -1156,18 +1158,18 @@ h2{font-size:1.15rem;font-weight:700}
   async function aiReview(form){
     const f = new FormData(form), mode = f.get("aiMode")==="variant" ? "variant" : "check", wish = String(f.get("wish")||"").trim();
     if(mode==="variant" && !wish) return;
-    const id = rOpen.id; rOpen.busy = true; rOpen.wish = wish; renderRecipeSheet();
+    const id = rOpen.id, req = rOpen; rOpen.busy = true; rOpen.wish = wish; renderRecipeSheet();
     toast(L("Die KI überarbeitet das Rezept …","The AI is revising the recipe …"));
     try{
       const res = await window.SB.api("POST", "/api/recipes/"+encodeURIComponent(id)+"/ai-review", {mode, wish});
-      if(!rOpen || rOpen.id!==id) return;
+      if(rOpen!==req) return;  // inzwischen abgebrochen oder zu Bearbeiten gewechselt
       const cur = S.recipes.find(x=>x.id===id) || {};
       rOpen = {id, mode:"edit", data:Object.assign({}, cur, res.recipe), changes:res.changes||[], note:res.note||""};
       renderRecipeSheet(); $("rsheet").scrollTop = 0;
       toast(L("Vorschlag bitte prüfen, dann übernehmen oder als neues Rezept speichern.","Please check the proposal, then apply it or save it as a new recipe."));
     }catch(e){
       toast(e.message || L("Das hat nicht geklappt.","That didn’t work."));
-      if(rOpen && rOpen.id===id){ rOpen.busy = false; renderRecipeSheet(); }
+      if(rOpen===req){ rOpen.busy = false; renderRecipeSheet(); }
     }
   }
   async function scheduleRecipe(date){
@@ -1271,12 +1273,12 @@ h2{font-size:1.15rem;font-weight:700}
     else if(act==="recipeOpen"){ closeSheet(); openRecipe(id, "view"); }
     else if(act==="recipeNew") openRecipe(null, "edit");
     else if(act==="recipeClose") closeRecipe();
-    else if(act==="recipeEdit"){ rOpen = {id:rOpen.id, mode:"edit", data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id))}; renderRecipeSheet(); }
+    else if(act==="recipeEdit"){ rOpen = {id:rOpen.id, mode:"edit", data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id) || rOpen.data)}; renderRecipeSheet(); }
     else if(act==="recipeView"){ rOpen = {id:rOpen.id, mode:"view"}; renderRecipeSheet(); }
     else if(act==="recipeVersions"){ rOpen = {id:rOpen.id, mode:"versions", versions:null, data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id) || rOpen.data)}; renderRecipeSheet(); loadVersions(); }
     else if(act==="versionShow"){ rOpen.show = rOpen.show===id ? null : id; renderRecipeSheet(); }
     else if(act==="versionRestore") restoreVersion(id);
-    else if(act==="recipeAi"){ rOpen = {id:rOpen.id, mode:"ai", aiMode:"check", data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id))}; renderRecipeSheet(); }
+    else if(act==="recipeAi"){ rOpen = {id:rOpen.id, mode:"ai", aiMode:"check", data:Object.assign({}, S.recipes.find(r=>r.id===rOpen.id) || rOpen.data)}; renderRecipeSheet(); }
     else if(act==="aiWish"){ const i = $("aiWish"); if(i){ const v = b.dataset.v, cur = i.value.trim(); i.value = cur ? (cur.split(/,\s*/).includes(v) ? cur : cur+", "+v) : v; rOpen.wish = i.value; i.focus(); } }
     else if(act==="recipeDelete"){ const r = S.recipes.find(x=>x.id===rOpen.id); if(r && confirm(L("„"+r.title+"“ aus der Rezeptdatenbank löschen?","Delete “"+r.title+"” from the recipe database?"))) save(()=>db.doc("recipes/"+r.id).delete(), L("Rezept gelöscht","Recipe deleted")).then(ok=>{ if(ok) closeRecipe(); }); }
     else if(act==="lang"){ const v = b.dataset.v; if(v!==LANG) save(()=>db.doc("plan/settings").set(Object.assign({}, S.settings||{}, {language:v}))).then(ok=>{ if(ok) setLang(v); }); }
