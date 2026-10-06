@@ -1,3 +1,5 @@
+[English](en/setup-fedora.md) · **Deutsch**
+
 # Einrichtung auf einem Fedora-Server
 
 Supper Board läuft als Podman-Container und wird über systemd (Quadlet) gestartet – ohne Root-Rechte, mit automatischem Start nach einem Neustart.

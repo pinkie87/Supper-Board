@@ -1,3 +1,5 @@
+[English](en/ai.md) · **Deutsch**
+
 # KI einrichten
 
 Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt eingefügte Rezepttexte um und erfindet Rezepte auf Wunsch. Umschalten in der `.env` mit `LLM_PROVIDER` und danach den Dienst neu starten.

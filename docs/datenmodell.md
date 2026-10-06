@@ -1,3 +1,5 @@
+[English](en/data-model.md) · **Deutsch**
+
 # Datenmodell
 
 Alles liegt als JSON-Dokumente in Sammlungen in einer SQLite-Datei (`/data/supper-board.sqlite3` im Container). Board, Zeitplan und KI lesen und schreiben dieselben Dokumente. Datumsangaben sind lokale `JJJJ-MM-TT`-Texte.

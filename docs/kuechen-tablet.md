@@ -1,3 +1,5 @@
+[English](en/kitchen-tablet.md) · **Deutsch**
+
 # Küchen-Tablet
 
 Ab einer Bildschirmbreite von **960 Pixeln** zeigt das Board eine dreispaltige Küchenansicht: heute, die kommenden Tage sowie nächster Einkauf und Gefrierschrank. Ein 10-Zoll-Tablet im Querformat reicht dafür; ein 8-Zoll-Tablet zeigt die Handy-Ansicht.
