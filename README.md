@@ -6,7 +6,7 @@
 
 A shared dinner board for the household, self-hosted on your own server. It shows what's for dinner tonight, a two-week meal plan with recipes, when to thaw something and the next shopping list. If you like, an AI (Claude or a local model via Ollama) writes new plans and learns from your ratings. Reminders reach your phone through Home Assistant.
 
-Based on [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-Board) (MIT license). The original ran as a Claude artifact with Walmart pickup orders in the US. This version is set up for Germany: the interface and recipes are in German, units are metric, everything runs on your own server, and the shopping list targets REWE (or any other supermarket). The guides in `docs/` are in German.
+Based on [weezerhunter/Supper-Board](https://github.com/weezerhunter/Supper-Board) (MIT license). The original ran as a Claude artifact with Walmart pickup orders in the US. This version is set up for Germany: the interface and recipes are in German, units are metric, everything runs on your own server, and the shopping list targets REWE (or any other supermarket). Detailed guides are available in English (`docs/en/`) and German (`docs/`).
 
 ### Features
 
@@ -81,8 +81,8 @@ Set at least these values in `.env`:
 
 - `SB_PASSWORD` – a password for the board (the browser asks once; any user name works)
 - `SB_PUBLIC_URL` – the server's address, e.g. `http://192.168.1.50:8080`
-- `LLM_PROVIDER` – start with `none`; later `claude` (plus `ANTHROPIC_API_KEY`) or `ollama`, see [docs/ki.md](docs/ki.md)
-- Leave the Home Assistant settings empty for now; see [docs/home-assistant.md](docs/home-assistant.md)
+- `LLM_PROVIDER` – start with `none`; later `claude` (plus `ANTHROPIC_API_KEY`) or `ollama`, see [docs/en/ai.md](docs/en/ai.md)
+- Leave the Home Assistant settings empty for now; see [docs/en/home-assistant.md](docs/en/home-assistant.md)
 - Using a store other than REWE: change `SB_STORE_NAME`, `SB_STORE_URL` and `SB_STORE_SEARCH_URL`
 
 **3. Build the container** (takes a few minutes the first time)
@@ -133,7 +133,7 @@ podman build -t localhost/supper-board:latest -f Containerfile .
 systemctl --user restart supper-board
 ```
 
-**If something goes wrong:** `journalctl --user -u supper-board -f` shows the server log. Backups, compose instead of systemd and access from outside your home network are covered in [docs/einrichtung-fedora.md](docs/einrichtung-fedora.md). Further guides (in German): [Home Assistant](docs/home-assistant.md), [AI setup](docs/ki.md), [data model](docs/datenmodell.md), [kitchen tablet](docs/kuechen-tablet.md).
+**If something goes wrong:** `journalctl --user -u supper-board -f` shows the server log. Backups, compose instead of systemd and access from outside your home network are covered in [docs/en/setup-fedora.md](docs/en/setup-fedora.md). Further guides: [Home Assistant](docs/en/home-assistant.md), [AI setup](docs/en/ai.md), [data model](docs/en/data-model.md), [kitchen tablet](docs/en/kitchen-tablet.md).
 
 ### Development
 

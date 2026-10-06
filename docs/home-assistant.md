@@ -1,3 +1,5 @@
+[English](en/home-assistant.md) · **Deutsch**
+
 # Home Assistant einbinden
 
 Supper Board schickt Benachrichtigungen über die `notify`-Dienste von Home Assistant – z. B. an die Companion-App auf euren Handys. Zusätzlich kann Home Assistant abfragen, was es heute gibt, und das im Dashboard oder in eigenen Automationen verwenden.
