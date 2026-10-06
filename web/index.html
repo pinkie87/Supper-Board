@@ -1076,13 +1076,13 @@ h2{font-size:1.15rem;font-weight:700}
       return;
     }
     if(rOpen.mode==="ai"){
-      const presets = [[L('vegetarisch','vegetarian')],[L('vegan','vegan')],[L('glutenfrei','gluten-free')],[L('laktosefrei','lactose-free')],[L('kalorienärmer','lighter')],[L('kinderfreundlich','kid-friendly')]];
+      const presets = [L('vegetarisch','vegetarian'),L('vegan','vegan'),L('glutenfrei','gluten-free'),L('laktosefrei','lactose-free'),L('kalorienärmer','lighter'),L('kinderfreundlich','kid-friendly')];
       const variant = rOpen.aiMode==="variant";
       $("rsheetDyn").innerHTML = head(r.title)+'<form class="tool" id="aiReviewForm" style="margin-top:12px" autocomplete="off">'+
         '<span class="eyebrow">'+L('Mit KI überarbeiten','Revise with AI')+'</span>'+
         '<label class="check"><input type="radio" name="aiMode" value="check"'+(variant?'':' checked')+'>'+L('Prüfen und korrigieren – z. B. Lesefehler, fehlende Mengen, Einheiten, unklare Schritte','Check and correct – e.g. reading errors, missing amounts, units, unclear steps')+'</label>'+
         '<label class="check"><input type="radio" name="aiMode" value="variant"'+(variant?' checked':'')+'>'+L('Umbauen, z. B. vegetarisch','Adapt, e.g. vegetarian')+'</label>'+
-        (variant?'<div class="row-btns">'+presets.map(([t])=>'<button type="button" class="btn small ghost" data-act="aiWish" data-v="'+esc(t)+'">'+esc(t)+'</button>').join("")+'</div>'+
+        (variant?'<div class="row-btns">'+presets.map(t=>'<button type="button" class="btn small ghost" data-act="aiWish" data-v="'+esc(t)+'">'+esc(t)+'</button>').join("")+'</div>'+
           '<label class="field">'+L('Wunsch','Request')+'<input id="aiWish" name="wish" type="text" required value="'+esc(rOpen.wish||"")+'" placeholder="'+L('z. B. vegetarisch, mit Linsen statt Hack','e.g. vegetarian, lentils instead of mince')+'"></label>':'')+
         '<p class="muted" style="margin:0;font-size:.88rem">'+L('Du bekommst einen Vorschlag mit einer Liste der Änderungen und entscheidest dann: übernehmen (die jetzige Fassung bleibt als Version erhalten) oder als neues Rezept speichern.','You get a proposal with a list of changes and then decide: apply it (the current version is kept) or save it as a new recipe.')+'</p>'+
         '<div class="row-btns"><button class="btn small" type="submit"'+(rOpen.busy?' disabled':'')+'>'+(rOpen.busy?L('KI arbeitet …','AI is working …'):L('Vorschlag erstellen','Create proposal'))+'</button>'+

@@ -42,7 +42,7 @@ def snapshot(store: Store, recipe_id: str, old: dict) -> None:
 
 def list_versions(store: Store, recipe_id: str) -> list[dict]:
     """Ältere Fassungen eines Rezepts, neueste zuerst."""
-    found = [v for v in store.list("recipe_versions") if v.get("recipe") == recipe_id]
+    found = store.find("recipe_versions", "recipe", recipe_id)
     return sorted(found, key=lambda v: (v.get("version") or 0, v.get("at") or ""), reverse=True)
 
 

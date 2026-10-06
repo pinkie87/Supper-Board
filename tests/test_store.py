@@ -11,6 +11,15 @@ def test_set_get_list(store):
     assert store.list("grocery")[0]["id"] == "a"
 
 
+
+def test_find_filters_by_field(store):
+    store.set("recipe_versions", "a", {"recipe": "r1", "version": 1})
+    store.set("recipe_versions", "b", {"recipe": "r2", "version": 1})
+    store.set("recipe_versions", "c", {"recipe": "r1", "version": 2})
+    store.set("recipes", "d", {"recipe": "r1"})
+    assert [d["id"] for d in store.find("recipe_versions", "recipe", "r1")] == ["a", "c"]
+    assert store.find("recipe_versions", "recipe", "fehlt") == []
+
 def test_update_merges_and_deletes_fields(store):
     store.set("plan", "current", {"status": "active", "pickup": "Sa.", "meta": {"a": 1, "b": 2}})
     store.update("plan", "current", {"status": "drafted", "pickup": {"__delete__": True}, "meta": {"b": 3}})

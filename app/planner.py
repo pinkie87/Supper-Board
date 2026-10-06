@@ -584,7 +584,7 @@ REVIEW_SCHEMA = {
 
 async def recipe_review(store: Store, settings: Settings, recipe: dict, mode: str, wish: str = "") -> dict:
     """Ein gespeichertes Rezept von der KI prüfen lassen ("check") oder umbauen ("variant")."""
-    current = {k: recipe.get(k) for k in ("title", "description", "serves", "time", "oven", "ingredients", "steps", "tip", "tags")}
+    current = {k: recipe.get(k) for k in versions.CONTENT if k != "source"}
     data = json.dumps(current, ensure_ascii=False, indent=1)
     if mode == "variant":
         cur = store.get("plan", "current") or {}
