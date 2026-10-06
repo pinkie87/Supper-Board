@@ -1,0 +1,12 @@
+{
+  "name": "Supper Board",
+  "short_name": "Supper Board",
+  "lang": "de",
+  "start_url": "/#today",
+  "display": "standalone",
+  "background_color": "#FBF4EA",
+  "theme_color": "#FBF4EA",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

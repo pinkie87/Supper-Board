@@ -1,0 +1,17 @@
+# Start mit:  podman compose up -d --build   (oder: docker compose up -d --build)
+services:
+  supper-board:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/supper-board:latest
+    container_name: supper-board
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - supper-board-data:/data
+    restart: unless-stopped
+
+volumes:
+  supper-board-data:
