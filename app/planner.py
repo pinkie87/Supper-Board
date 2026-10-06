@@ -245,12 +245,31 @@ def _context(store: Store, settings: Settings) -> str:
         "ERNÄHRUNGSRICHTLINIEN DES HAUSHALTS:\n" + (cur.get("guidelines") or "(keine)"),
         "BISHER GEKOCHT (mit Bewertung und Notizen):\n" + ("\n".join(eaten.values()) or "(noch nichts)"),
         "WÜNSCHE FÜR DEN NÄCHSTEN PLAN:\n" + ("\n".join("- " + i["text"] for i in store.list("ideas")) or "(keine)"),
-        "IM GEFRIERSCHRANK:\n" + ("\n".join("- " + f["name"] + (f" (für {f['forMeal']})" if f.get("forMeal") else "") for f in store.list("freezer")) or "(leer)"),
+        "BESTAND ZU HAUSE (nach Lagerort):\n" + stock_text(store),
         "VORRAT VORHANDEN: " + (", ".join(s["name"] for s in staples if s.get("status") == "have") or "(nichts bestätigt)"),
         "VORRAT KNAPP (kommt ohnehin auf die Liste): " + (", ".join(s["name"] for s in staples if s.get("status") == "low") or "(nichts)"),
         "REZEPTDATENBANK DES HAUSHALTS:\n" + ("\n".join(recipes) or "(leer)"),
     ]
     return "\n\n".join(parts)
+
+
+LOCATIONS = {"freezer": "Gefrierschrank", "fridge": "Kühlschrank", "pantry": "Vorratsschrank", "cellar": "Keller"}
+
+
+def stock_text(store: Store) -> str:
+    """Bestand für die KI, nach Lagerort gruppiert. Einträge ohne Lagerort liegen im Gefrierschrank."""
+    groups: dict[str, list[str]] = {}
+    for f in sorted(store.list("freezer"), key=lambda f: (f.get("best") or "9999", f.get("at") or "")):
+        line = "- " + f["name"]
+        if f.get("amount"):
+            line += f", {f['amount']}"
+        if f.get("best"):
+            line += f" (haltbar bis {f['best']})"
+        if f.get("forMeal"):
+            line += f" (für {f['forMeal']})"
+        loc = f.get("location") or "freezer"
+        groups.setdefault(LOCATIONS.get(loc, loc), []).append(line)
+    return "\n".join(f"{loc}:\n" + "\n".join(lines) for loc, lines in groups.items()) or "(leer)"
 
 
 def _meal_docs(raw: list[dict], start: date, end: date, prefix: str, recipes: dict[str, dict]) -> list[dict]:
@@ -358,7 +377,7 @@ TAGE:
 
 SO GEHST DU VOR:
 - Halte dich an die Ernährungsrichtlinien. Standard-Rhythmus, falls dort nichts anderes steht: kochen Mo/Mi/Fr, am Folgetag Reste (Di/Do/Sa), Sonntag flexibel.
-- Lerne aus dem Feedback: Gerichte mit 4–5 Sternen dürfen wiederkommen (höchstens zwei Wiederholungen pro Plan, Notizen umsetzen), Gerichte mit 1–2 Sternen nie wieder. Setze jeden Wunsch um. Verbrauche zuerst, was im Gefrierschrank liegt.
+- Lerne aus dem Feedback: Gerichte mit 4–5 Sternen dürfen wiederkommen (höchstens zwei Wiederholungen pro Plan, Notizen umsetzen), Gerichte mit 1–2 Sternen nie wieder. Setze jeden Wunsch um. Verbrauche zuerst, was im Bestand liegt – vor allem, was bald abläuft, im Kühlschrank liegt oder im Gefrierschrank ist.
 - Gut bewertete Rezepte aus der Rezeptdatenbank darfst du wiederverwenden: dann "recipeId" auf die id setzen und "recipe" mit leeren Feldern füllen (Titel genügt). Sonst ist "recipeId" leer und du schreibst ein vollständiges eigenes Rezept.
 - Woche 1 ({span(start, week2 - timedelta(days=1))}) mit frischem Fleisch/Fisch. Fleisch und Fisch für Woche 2 werden am Einkaufstag eingefroren: Jedes Gericht in Woche 2 mit solchem Protein bekommt im Feld "thaw" kurz, was am Vorabend in den Kühlschrank muss, z. B. "die Hähnchenbrust (ca. 500 g)". Sonst bleibt "thaw" leer.
 - Abwechslungsreiche Proteine, unter der Woche höchstens ca. 45 Minuten Arbeitszeit.

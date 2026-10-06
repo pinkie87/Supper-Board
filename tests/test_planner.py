@@ -160,3 +160,18 @@ def test_run_job_reports_errors(store, settings):
     msg = run(planner.run_job(store, settings, "draft", boom))
     assert msg == "kaputt"
     assert store.get("plan", "job")["state"] == "error"
+
+
+def test_stock_grouped_by_location(store, settings):
+    store.set("freezer", "a", {"name": "Hähnchenbrust", "at": "2026-10-01"})  # ältere Einträge ohne Lagerort
+    store.set("freezer", "b", {"name": "Joghurt", "amount": "2 Becher", "location": "fridge", "best": "2026-10-08", "at": "2026-10-02"})
+    store.set("freezer", "c", {"name": "Kartoffeln", "amount": "5 kg", "location": "Garage", "at": "2026-10-03"})
+    text = planner.stock_text(store)
+    assert "Gefrierschrank:\n- Hähnchenbrust" in text
+    assert "Kühlschrank:\n- Joghurt, 2 Becher (haltbar bis 2026-10-08)" in text
+    assert "Garage:\n- Kartoffeln, 5 kg" in text
+    assert "BESTAND ZU HAUSE" in planner._context(store, settings)
+
+
+def test_empty_stock(store):
+    assert planner.stock_text(store) == "(leer)"

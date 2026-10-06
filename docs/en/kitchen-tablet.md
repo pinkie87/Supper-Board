@@ -2,7 +2,7 @@
 
 # Kitchen tablet
 
-On screens **960 pixels wide or more**, the board switches to a three-column kitchen layout: today, the coming days, and the next shop plus the freezer. A 10-inch tablet in landscape is wide enough; an 8-inch tablet shows the phone layout.
+On screens **960 pixels wide or more**, the board switches to a three-column kitchen layout: today, the coming days, and the next shop plus your stock (which you can add to and edit right there). A 10-inch tablet in landscape is wide enough; an 8-inch tablet shows the phone layout.
 
 ## Devices
 

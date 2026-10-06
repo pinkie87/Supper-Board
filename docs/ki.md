@@ -6,7 +6,7 @@ Die KI schreibt neue Speisepläne, ersetzt Gerichte, die ihr ablehnt, wandelt ei
 
 | `LLM_PROVIDER` | Was passiert | Datenschutz |
 |---|---|---|
-| `claude` | Claude über die Anthropic-API. Beste Rezeptqualität. | Beim Planen gehen Richtlinien, Bewertungen, Notizen, Wünsche, Vorrat, Gefrierschrank und die Titel eurer Rezepte an Anthropic. Alles andere bleibt auf dem Server. |
+| `claude` | Claude über die Anthropic-API. Beste Rezeptqualität. | Beim Planen gehen Richtlinien, Bewertungen, Notizen, Wünsche, Vorrat, Bestand und die Titel eurer Rezepte an Anthropic. Alles andere bleibt auf dem Server. |
 | `ollama` | Lokales Modell über [Ollama](https://ollama.com), auf dem Server oder deinem PC. | Nichts verlässt das Heimnetz. |
 | `openai` | OpenAI-kompatible Schnittstelle: lokal (llama.cpp, LM Studio, auch mit Unsloth-Modellen) oder in der Cloud (Google Gemini, OpenRouter – mit kostenlosem Kontingent). | Lokal: nichts verlässt das Heimnetz. Cloud: wie bei Claude, siehe unten. |
 | `none` | Keine KI. Pläne werden aus der Rezeptdatenbank zusammengestellt (gut bewertete zuerst, mit Abwechslung). | Nichts verlässt den Server. |
@@ -172,7 +172,7 @@ Beide bieten eine OpenAI-kompatible Schnittstelle und kostenlose Modelle an. Sie
 
 **Grenzen der kostenlosen Kontingente:** Es gibt Limits pro Minute und pro Tag; wie hoch, legen die Anbieter fest und ändern es gelegentlich. Meldet der Anbieter „zu viele Anfragen“, pausiert der Foto-Import und macht automatisch weiter (Wartezeit wächst bis höchstens eine Stunde) – ein ganzes Buch dauert so eventuell mehrere Tage, läuft aber ohne dein Zutun. „Erneut versuchen“ startet sofort einen neuen Versuch. Der Planentwurf braucht nur eine Anfrage pro Woche.
 
-**Datenschutz:** Bei kostenlosen Angeboten können Anbieter die gesendeten Daten zur Verbesserung ihrer Modelle verwenden. Gesendet werden beim Planen Richtlinien, Bewertungen, Notizen, Wünsche, Vorrat, Gefrierschrank und Rezepttitel, beim Foto-Import die Fotos. Wer das nicht möchte, nimmt Ollama auf dem eigenen PC.
+**Datenschutz:** Bei kostenlosen Angeboten können Anbieter die gesendeten Daten zur Verbesserung ihrer Modelle verwenden. Gesendet werden beim Planen Richtlinien, Bewertungen, Notizen, Wünsche, Vorrat, Bestand und Rezepttitel, beim Foto-Import die Fotos. Wer das nicht möchte, nimmt Ollama auf dem eigenen PC.
 
 ## Wenn der PC nicht läuft
 
