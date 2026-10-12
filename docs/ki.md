@@ -92,6 +92,16 @@ Gelesen werden die Rezeptdaten, die die meisten Seiten für Suchmaschinen mitlie
 
 Die Rezepte sind für den privaten Gebrauch gedacht: Sie bleiben auf deinem Server und werden nicht weitergegeben. Bitte nur Rezepte holen, die ihr wirklich nutzen wollt, nicht ganze Seiten kopieren – Texte und Rezeptsammlungen sind urheberrechtlich geschützt.
 
+## JSON-Datei importieren
+
+Unter „Rezepte → JSON-Datei“ lassen sich viele Rezepte auf einmal aus einer Datei übernehmen, z. B. aus einem eigenen Scraper oder einem Export. Erkannt werden:
+
+- Listen mit deutschen Feldnamen: `titel`, `beschreibung`, `zutaten` (Text oder `{"menge": …, "zutat": …}`), `schritte`, `portionen` („4 Portionen“), `zeit` („Gesamtzeit: 40 Min“), `kategorie`, `url` und `extra` (z. B. `Saison`, `Allergene`, `Dazu passt`),
+- das Format des Boards (`title`, `ingredients`, `steps` …),
+- schema.org-Rezepte (`name`, `recipeIngredient`, `recipeInstructions` …).
+
+`kategorie` und `Saison` werden zu Tags, die Ofentemperatur wird aus den Schritten gelesen, weitere Angaben aus `extra` landen im Tipp. Bilder und Werkzeuglisten werden nicht übernommen. Wahlweise kommen die Rezepte direkt in die Datenbank oder erst unter „Import“ zum Prüfen. Rezepte, deren Link schon in der Datenbank steht (ohne Link: gleicher Titel), werden übersprungen – die Datei lässt sich also gefahrlos erneut einlesen.
+
 ## Text umwandeln – auch ohne KI
 
 Unter „Rezepte → Text umwandeln“ wird eingefügter Rezepttext zum Rezept, z. B. die Ausgabe einer Texterkennung oder einer KI im Browser.

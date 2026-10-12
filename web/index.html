@@ -411,6 +411,7 @@ h2{font-size:1.15rem;font-weight:700}
         <button type="button" class="btn small" data-act="recipeNew">Neues Rezept</button>
         <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="url">Von Link importieren</button>
         <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="links">Mehrere Links</button>
+        <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="json">JSON-Datei</button>
         <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="text">Text umwandeln</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="ai">Von KI erfinden lassen</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="photo">Von Foto importieren</button>
@@ -977,6 +978,15 @@ h2{font-size:1.15rem;font-weight:700}
       setTimeout(()=>{ const i = $("toolInput"); if(i) i.focus(); }, 30);
       return;
     }
+    if(toolMode==="json"){
+      tool.innerHTML = '<form class="tool" id="jsonForm" style="margin-top:10px" autocomplete="off">'+
+        '<label class="field">'+L('JSON-Datei mit Rezepten','JSON file with recipes')+'<input id="jsonInput" type="file" accept=".json,application/json" required></label>'+
+        '<label class="check"><input type="radio" name="jsonMode" value="save" checked>'+L('Direkt in die Rezeptdatenbank übernehmen','Save straight to the recipe database')+'</label>'+
+        '<label class="check"><input type="radio" name="jsonMode" value="review">'+L('Erst unter „Import“ zum Prüfen ablegen','Put them under “Import” for review first')+'</label>'+
+        '<p class="muted" style="margin:0;font-size:.88rem">'+L('Erkannt werden Listen mit Feldern wie „titel“, „zutaten“ (mit „menge“ und „zutat“), „schritte“, „portionen“, „zeit“, „kategorie“ und „url“, außerdem das Format des Boards und schema.org-Rezepte. Bilder werden nicht übernommen. Rezepte, deren Link schon in der Datenbank steht, werden übersprungen.','Recognised are lists with fields such as “titel”, “zutaten” (with “menge” and “zutat”), “schritte”, “portionen”, “zeit”, “kategorie” and “url”, as well as the board’s own format and schema.org recipes. Images are not taken over. Recipes whose link is already in the database are skipped.')+'</p>'+
+        '<div class="row-btns"><button class="btn small" type="submit">'+L('Importieren','Import')+'</button><button class="btn small ghost" type="button" data-act="recipeTool" data-mode="">'+L('Abbrechen','Cancel')+'</button></div></form>';
+      return;
+    }
     if(toolMode==="links"){
       linkFind = {links:[], next:"", checked:new Set(), busy:false};
       tool.innerHTML = '<form class="tool" id="linksForm" style="margin-top:10px" autocomplete="off">'+
@@ -1015,15 +1025,15 @@ h2{font-size:1.15rem;font-weight:700}
     const errors = list.filter(i=>i.state==="error").length;
     $("importCount").textContent = [open?L(open+" zu prüfen",open+" to review"):"", pending?L(pending+" in Arbeit",pending+" in progress"):""].filter(Boolean).join(" · ");
     if(!list.length){ $("importsDyn").innerHTML = ""; return; }
-    const linkDone = list.filter(i=>i.kind==="link" && i.state==="done" && (i.recipes||[]).length).length;
-    const bulk = (linkDone>1?'<button type="button" class="btn small" data-act="importAcceptLinks">'+L('Alle '+linkDone+' Link-Rezepte ungeprüft übernehmen','Save all '+linkDone+' link recipes unreviewed')+'</button>':'')+
+    const linkDone = list.filter(i=>(i.kind==="link"||i.kind==="file") && i.state==="done" && (i.recipes||[]).length).length;
+    const bulk = (linkDone>1?'<button type="button" class="btn small" data-act="importAcceptLinks">'+L('Alle '+linkDone+' Rezepte ungeprüft übernehmen','Save all '+linkDone+' recipes unreviewed')+'</button>':'')+
       (errors>1?'<button type="button" class="btn small ghost" data-act="importRetryAll">'+L('Alle mit Fehler erneut versuchen','Retry all failed')+'</button>':'');
     $("importsDyn").innerHTML = (bulk?'<div class="row-btns" style="margin-bottom:8px">'+bulk+'</div>':'')+
       '<div class="implist">'+list.map(i=>{
-        const isLink = i.kind==="link";
+        const isLink = i.kind==="link" || i.kind==="file";
         const img = isLink ? '<div class="linkico">'+LINK+'</div>' : '<img src="/api/imports/'+encodeURIComponent(i.id)+'/image/0" alt="" loading="lazy">';
         const n = (i.images||[]).length, recs = i.recipes||[];
-        const pages = isLink ? '<span class="src">'+esc((i.url||"").replace(/^https?:\/\/(www\.)?/,""))+'</span><br>' : n>1 ? L(n+' Fotos',n+' photos')+' · ' : '';
+        const pages = isLink ? '<span class="src">'+esc((i.url||(i.kind==="file"?L("JSON-Datei","JSON file"):"")).replace(/^https?:\/\/(www\.)?/,""))+'</span><br>' : n>1 ? L(n+' Fotos',n+' photos')+' · ' : '';
         let body;
         if(i.state==="waiting") body = '<span class="muted">'+pages+(i.message?esc(i.message):L('Wartet …','Waiting …'))+'</span>';
         else if(i.state==="working") body = '<span>'+pages+'<b>'+(isLink?L('Wird abgerufen …','Fetching …'):L('Wird gelesen …','Reading …'))+'</b></span>';
@@ -1105,6 +1115,23 @@ h2{font-size:1.15rem;font-weight:700}
       const r = await window.SB.api("POST", "/api/imports/links", {urls});
       toolMode = ""; linkFind = null; $("recipeTool").innerHTML = "";
       toast(L(r.ids.length+" Links in der Warteschlange"+(r.skipped?" · "+r.skipped+" schon vorhanden":""),r.ids.length+" links queued"+(r.skipped?" · "+r.skipped+" already there":"")));
+    }catch(e){ toast(e.message || L("Das hat nicht geklappt.","That didn’t work.")); }
+    finally{ toolBusy = false; renderRecipes(); }
+  }
+  async function importJson(form){
+    if(toolBusy) return;
+    const file = ($("jsonInput").files||[])[0]; if(!file) return;
+    let data;
+    try{ data = JSON.parse(await file.text()); }
+    catch(e){ toast(L("Die Datei ist kein gültiges JSON.","The file is not valid JSON.")); return; }
+    const mode = (new FormData(form)).get("jsonMode")==="review" ? "review" : "save";
+    toolBusy = true; renderRecipes();
+    try{
+      const r = await window.SB.api("POST", "/api/recipes/import-json", {data, mode});
+      toolMode = ""; $("recipeTool").innerHTML = "";
+      const skip = r.skipped ? L(" · "+r.skipped+" schon vorhanden"," · "+r.skipped+" already there") : "";
+      toast(mode==="review" ? L(r.added+" Rezepte unter „Import“ zum Prüfen",r.added+" recipes under “Import” for review")+skip
+                            : L(r.added+" Rezepte übernommen",r.added+" recipes saved")+skip);
     }catch(e){ toast(e.message || L("Das hat nicht geklappt.","That didn’t work.")); }
     finally{ toolBusy = false; renderRecipes(); }
   }
@@ -1410,7 +1437,7 @@ h2{font-size:1.15rem;font-weight:700}
     else if(act==="lang"){ const v = b.dataset.v; if(v!==LANG) save(()=>db.doc("plan/settings").set(Object.assign({}, S.settings||{}, {language:v}))).then(ok=>{ if(ok) setLang(v); }); }
     else if(act==="importReview") reviewImport(id, +b.dataset.i);
     else if(act==="importAcceptLinks"){
-      const done = S.imports.filter(i=>i.kind==="link" && i.state==="done" && (i.recipes||[]).length);
+      const done = S.imports.filter(i=>(i.kind==="link"||i.kind==="file") && i.state==="done" && (i.recipes||[]).length);
       if(confirm(L(done.length+" Rezepte ohne Prüfung in die Rezeptdatenbank übernehmen?","Save "+done.length+" recipes to the recipe database without reviewing them?")))
         save(async()=>{ for(const i of done){ for(const r of i.recipes) await db.collection("recipes").add(Object.assign({}, r, {createdAt:new Date().toISOString()})); await window.SB.api("DELETE","/api/imports/"+encodeURIComponent(i.id)); } },
           L(done.length+" Rezepte übernommen",done.length+" recipes saved"));
@@ -1433,6 +1460,7 @@ h2{font-size:1.15rem;font-weight:700}
     if(e.target.id==="toolForm"){ e.preventDefault(); runTool(e.submitter); }
     else if(e.target.id==="photoForm"){ e.preventDefault(); uploadPhotos(e.target); }
     else if(e.target.id==="linksForm"){ e.preventDefault(); importLinks(); }
+    else if(e.target.id==="jsonForm"){ e.preventDefault(); importJson(e.target); }
     else if(e.target.id==="recipeForm"){ e.preventDefault(); saveRecipeForm(e.target, e.submitter && e.submitter.value==="new"); }
     else if(e.target.classList.contains("js-edit-stock")){
       e.preventDefault(); const f = e.target, id = f.dataset.id, name = f.elements.name.value.trim(); if(!name) return;
@@ -1491,7 +1519,7 @@ h2{font-size:1.15rem;font-weight:700}
     "Auf die nächste Einkaufsliste":"Add to the next shopping list",
     "z. B. Eier, Kaffee, Küchenrolle":"e.g. eggs, coffee, paper towels",
     "Artikel für die nächste Einkaufsliste":"Item for the next shopping list",
-    "Hinzufügen":"Add", "Mehrere Links":"Several links", "Demnächst":"Coming up", "Nächster Einkauf":"Next shop", "Artikel hinzufügen":"Add an item",
+    "Hinzufügen":"Add", "Mehrere Links":"Several links", "JSON-Datei":"JSON file", "Demnächst":"Coming up", "Nächster Einkauf":"Next shop", "Artikel hinzufügen":"Add an item",
     "Bestand":"Stock",
     "Was zu Hause lagert – im Gefrierschrank, Kühlschrank, Vorratsschrank oder an einem eigenen Ort. Wird beim Planen zuerst verbraucht.":"What you keep at home – in the freezer, fridge, pantry or a place of your own. Used up first when planning.",
     "z. B. Hähnchenschenkel":"e.g. chicken thighs", "Neu im Bestand":"New in stock", "Menge":"Amount", "Lagerort":"Location",

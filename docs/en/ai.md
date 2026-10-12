@@ -92,6 +92,16 @@ It reads the recipe data most sites provide for search engines (schema.org), oth
 
 The recipes are meant for private use: they stay on your server and are not shared. Please only fetch recipes you actually want to use rather than copying whole sites – texts and recipe collections are protected by copyright.
 
+## Importing a JSON file
+
+"Recipes → JSON file" takes over many recipes at once from a file, e.g. from your own scraper or an export. Recognised are:
+
+- lists with German field names: `titel`, `beschreibung`, `zutaten` (text or `{"menge": …, "zutat": …}`), `schritte`, `portionen` ("4 Portionen"), `zeit` ("Gesamtzeit: 40 Min"), `kategorie`, `url` and `extra` (e.g. `Saison`, `Allergene`, `Dazu passt`),
+- the board's own format (`title`, `ingredients`, `steps` …),
+- schema.org recipes (`name`, `recipeIngredient`, `recipeInstructions` …).
+
+`kategorie` and `Saison` become tags, the oven temperature is read from the steps, further details from `extra` go into the tip. Images and tool lists are not taken over. The recipes go either straight into the database or under "Import" for review first. Recipes whose link is already in the database (without a link: same title) are skipped – so the file can safely be imported again.
+
 ## Convert text – also without AI
 
 Under "Recipes → Convert text", pasted recipe text becomes a recipe, e.g. the output of a text recognition tool or of an AI in your browser.
