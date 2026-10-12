@@ -66,7 +66,7 @@ A recipe's rating is derived from all meals with a matching `recipeId`.
 | `grocery` | `{text, at}` – extras for the next shop |
 | `staples` | `{name, group, status, order}` – pantry, `status`: `have`, `low` or `unknown` |
 | `freezer` | `{name, amount, location, best, forMeal, at}` – stock (the name dates from when only the freezer was tracked). `location` is `freezer`, `fridge`, `pantry`, `cellar` or a custom place name; if missing, freezer is assumed. `best` = best before (YYYY-MM-DD), optional. |
-| `imports` | `{state, images, recipes, message, order, createdAt}` – import from photos or links (links also have `kind: "link"`, `url`, `title`): `state` is `waiting`, `working`, `done` or `error`; `recipes` are the recipes found but not yet reviewed. The photos are stored in `uploads/`. |
+| `imports` | `{state, images, recipes, message, order, createdAt}` – import from photos or links (links also have `kind: "link"`, `url`, `title`; from a JSON file for review `kind: "file"`): `state` is `waiting`, `working`, `done` or `error`; `recipes` are the recipes found but not yet reviewed. The photos are stored in `uploads/`. |
 | `recipe_versions` | `{recipe, version, note, at, data}` – earlier versions of a recipe (`data` = recipe fields), at most 30 per recipe |
 
 ### `plan` (four documents)

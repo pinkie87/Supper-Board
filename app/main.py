@@ -7,14 +7,14 @@ import json
 import logging
 import secrets
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from . import htmlrecipe, i18n, linkimport, llm, notify, photos, planner, recipes, scheduler, textparse, versions
+from . import htmlrecipe, i18n, jsonimport, linkimport, llm, notify, photos, planner, recipes, scheduler, textparse, versions
 from .config import Settings, settings as default_settings
 from .i18n import T
 from .seed import seed
@@ -340,6 +340,38 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
             raise HTTPException(400, str(e))
         photo_worker.wake.set()
         return result
+
+    @app.post("/api/recipes/import-json")
+    async def import_json(body: dict[str, Any] = Body(...)):
+        """Rezepte aus einer JSON-Datei: direkt speichern ("save") oder zum Prüfen ablegen ("review")."""
+        try:
+            found = jsonimport.map_file(body.get("data"))
+        except jsonimport.JsonImportError as e:
+            raise HTTPException(400, str(e))
+        if not found:
+            raise HTTPException(400, T("In der Datei wurden keine Rezepte erkannt.", "No recipes were recognised in the file."))
+        norm = lambda v: str(v or "").strip().rstrip("/").lower()  # noqa: E731
+        known = {norm(r.get("source")) for r in store.list("recipes") if "://" in str(r.get("source") or "")}
+        known |= {norm(i.get("url")) for i in store.list("imports") if i.get("url")}
+        titles = {norm(r.get("title")) for r in store.list("recipes")}
+        review = body.get("mode") == "review"
+        now = datetime.now().isoformat(timespec="seconds")
+        added = skipped = 0
+        for index, recipe in enumerate(found):
+            key = norm(recipe["source"]) if "://" in recipe["source"] else ""
+            if (key and key in known) or (not key and norm(recipe["title"]) in titles):
+                skipped += 1
+                continue
+            known.add(key)
+            titles.add(norm(recipe["title"]))
+            if review:
+                store.set("imports", new_id(), {"kind": "file", "url": recipe["source"] if key else "", "title": recipe["title"],
+                                                "state": "done", "recipes": [recipe], "images": [], "createdAt": now,
+                                                "order": f"{now}#{index:05d}"})
+            else:
+                versions.save(store, new_id(), dict(recipe, createdAt=now), T("JSON-Import", "JSON import"))
+            added += 1
+        return {"added": added, "skipped": skipped, "total": len(found)}
 
     @app.post("/api/recipes/find-links")
     async def find_links(body: dict[str, Any] = Body(...)):
