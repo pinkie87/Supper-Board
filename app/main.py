@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from . import i18n, llm, notify, photos, planner, recipes, scheduler, textparse, versions
+from . import htmlrecipe, i18n, linkimport, llm, notify, photos, planner, recipes, scheduler, textparse, versions
 from .config import Settings, settings as default_settings
 from .i18n import T
 from .seed import seed
@@ -248,7 +248,7 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
             page = await recipes.fetch_page(url)
         except recipes.ImportError_ as e:
             raise HTTPException(400, str(e))
-        recipe = recipes.parse_jsonld(page)
+        recipe = htmlrecipe.extract_recipe(page)
         if recipe and recipes.needs_metric(recipe) and settings.llm_enabled:
             recipe = await llm_call(planner.recipe_from_text(settings, json.dumps(recipe, ensure_ascii=False)))
         if not recipe:
@@ -327,6 +327,28 @@ def create_app(settings: Settings | None = None, run_scheduler: bool = True) -> 
             raise HTTPException(400, str(e))
         photo_worker.wake.set()
         return {"ids": ids}
+
+    # ---------- Mehrere Links ----------
+    @app.post("/api/imports/links")
+    async def create_link_imports(body: dict[str, Any] = Body(...)):
+        urls = body.get("urls") or []
+        if not isinstance(urls, list):
+            raise HTTPException(400, T("Ungültige Anfrage.", "Invalid request."))
+        try:
+            result = linkimport.create_link_imports(store, urls)
+        except linkimport.LinkError as e:
+            raise HTTPException(400, str(e))
+        photo_worker.wake.set()
+        return result
+
+    @app.post("/api/recipes/find-links")
+    async def find_links(body: dict[str, Any] = Body(...)):
+        url = str(body.get("url") or "").strip()
+        try:
+            page = await recipes.fetch_page(url)
+        except recipes.ImportError_ as e:
+            raise HTTPException(400, str(e))
+        return htmlrecipe.find_links(page, url)
 
     @app.post("/api/imports/{doc_id}/retry")
     async def retry_import(doc_id: str):

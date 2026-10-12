@@ -80,6 +80,18 @@ So läuft der Import:
 
 Die Fotos liegen bis zum Speichern oder Verwerfen in `uploads/` im Datenverzeichnis des Servers. Tipps: eine Seite pro Foto, gerade von oben, gutes Licht, kein Blitz. Unleserliche Stellen markiert die KI mit `[?]`.
 
+## Mehrere Links importieren – auch ohne KI
+
+Unter „Rezepte → Mehrere Links“ lassen sich viele Rezepte auf einmal übernehmen:
+
+1. Links einfügen, einen pro Zeile – oder den Link einer **Übersichtsseite** (Rezeptliste, Kategorie, Suchergebnis) eintragen und „Rezepte auf der Seite suchen“ antippen. Die gefundenen Rezepte erscheinen als Liste zum An- und Abwählen; „Nächste Seite dazuladen“ holt weitere Treffer, wenn die Seite blättert.
+2. „Importieren“ legt die Links in die Warteschlange. Der Server ruft die Seiten nacheinander mit einigen Sekunden Pause ab – die Seite darf dabei geschlossen werden. Links, die schon in der Datenbank oder in der Warteschlange stehen, werden übersprungen.
+3. Unter „Import“ erscheint jedes Rezept mit „Prüfen“. Wer nicht jedes einzeln ansehen möchte, nimmt „Alle Link-Rezepte ungeprüft übernehmen“ und überarbeitet später einzelne Rezepte (auch mit „Mit KI überarbeiten“).
+
+Gelesen werden die Rezeptdaten, die die meisten Seiten für Suchmaschinen mitliefern (schema.org), sonst Seiten mit den Abschnitten „Zutaten“ und „Zubereitung“. Dafür braucht es keine KI; mit eingerichteter KI klappt es auch bei Seiten ohne solche Gliederung. Übernommen werden nur Titel, Zutaten, Zubereitung und Angaben wie Zeit und Portionen – **keine Fotos**. Der Link wird als Quelle gespeichert.
+
+Die Rezepte sind für den privaten Gebrauch gedacht: Sie bleiben auf deinem Server und werden nicht weitergegeben. Bitte nur Rezepte holen, die ihr wirklich nutzen wollt, nicht ganze Seiten kopieren – Texte und Rezeptsammlungen sind urheberrechtlich geschützt.
+
 ## Text umwandeln – auch ohne KI
 
 Unter „Rezepte → Text umwandeln“ wird eingefügter Rezepttext zum Rezept, z. B. die Ausgabe einer Texterkennung oder einer KI im Browser.

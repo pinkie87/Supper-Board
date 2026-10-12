@@ -80,6 +80,18 @@ How the import works:
 
 Photos stay in `uploads/` in the server's data directory until you save or discard them. Tips: one page per photo, straight from above, good light, no flash. The AI marks unreadable parts with `[?]`.
 
+## Importing several links – also without AI
+
+"Recipes → Several links" takes over many recipes at once:
+
+1. Paste links, one per line – or enter the link of an **overview page** (recipe list, category, search result) and tap "Find recipes on the page". The recipes found appear as a list to tick or untick; "Load next page too" fetches more if the site has several pages.
+2. "Import" queues the links. The server fetches the pages one after another with a few seconds' pause – you can close the page meanwhile. Links already in the database or in the queue are skipped.
+3. Each recipe appears under "Import" with "Review". If you don't want to look at each one, use "Save all link recipes unreviewed" and revise single recipes later (also with "Revise with AI").
+
+It reads the recipe data most sites provide for search engines (schema.org), otherwise pages with "Ingredients" and "Instructions" sections. No AI is needed; with an AI set up it also works for pages without such structure. Only the title, ingredients, steps and details such as time and servings are taken – **no photos**. The link is kept as the source.
+
+The recipes are meant for private use: they stay on your server and are not shared. Please only fetch recipes you actually want to use rather than copying whole sites – texts and recipe collections are protected by copyright.
+
 ## Convert text – also without AI
 
 Under "Recipes → Convert text", pasted recipe text becomes a recipe, e.g. the output of a text recognition tool or of an AI in your browser.

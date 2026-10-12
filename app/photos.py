@@ -170,12 +170,17 @@ async def read_photos(store: Store, settings: Settings, doc_id: str) -> None:
 
 
 class PhotoWorker:
-    """Liest wartende Fotos nacheinander ein – auch nach einem Neustart weiter."""
+    """Liest wartende Fotos und Rezept-Links nacheinander ein – auch nach einem Neustart weiter."""
 
     def __init__(self, store: Store, settings: Settings):
         self.store, self.settings = store, settings
         self.wake = asyncio.Event()
         self.pause_until = 0.0  # nach einem Limit des Anbieters die ganze Warteschlange anhalten
+        self.next_link_at = 0.0  # Pause zwischen zwei Seitenabrufen
+
+    def _usable(self, doc: dict) -> bool:
+        # Links gehen auch ohne KI (strukturierte Rezeptdaten), Fotos nicht
+        return doc.get("kind") == "link" or self.settings.llm_enabled
 
     async def run(self) -> None:
         for doc in self.store.list("imports"):
@@ -183,13 +188,16 @@ class PhotoWorker:
                 self.store.update("imports", doc["id"], {"state": "waiting"})
         while True:
             now = time.time()
-            waiting = sorted((d for d in self.store.list("imports") if d.get("state") == "waiting"),
+            waiting = sorted((d for d in self.store.list("imports") if d.get("state") == "waiting" and self._usable(d)),
                              key=lambda d: d.get("order") or d.get("createdAt", ""))
-            if not waiting or not self.settings.llm_enabled:
+            if not waiting:
                 self.wake.clear()
                 await self.wake.wait()
                 continue
             ready = [d for d in waiting if (d.get("retryAt") or 0) <= now] if now >= self.pause_until else []
+            if ready and ready[0].get("kind") == "link" and now < self.next_link_at:
+                await asyncio.sleep(self.next_link_at - now)
+                continue
             if not ready:
                 next_at = max(self.pause_until, min(d.get("retryAt") or 0 for d in waiting))
                 self.wake.clear()
@@ -200,7 +208,12 @@ class PhotoWorker:
                 continue
             i18n.use_household(self.store)
             try:
-                await read_photos(self.store, self.settings, ready[0]["id"])
+                if ready[0].get("kind") == "link":
+                    from .linkimport import DELAY, read_link
+                    await read_link(self.store, self.settings, ready[0]["id"])
+                    self.next_link_at = time.time() + DELAY
+                else:
+                    await read_photos(self.store, self.settings, ready[0]["id"])
             except llm.LLMRateLimited:
                 doc = self.store.get("imports", ready[0]["id"]) or {}
                 self.pause_until = doc.get("retryAt") or time.time() + 60

@@ -250,7 +250,11 @@ h2{font-size:1.15rem;font-weight:700}
 .implist{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .imp{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:start;padding:12px 14px;border-top:1px solid var(--line)}
 .imp:first-child{border-top:0}
-.imp img{width:56px;height:72px;object-fit:cover;border-radius:6px;background:var(--sunk)}
+.imp img,.imp .linkico{width:56px;height:72px;object-fit:cover;border-radius:6px;background:var(--sunk)}
+.imp .linkico{display:grid;place-items:center;color:var(--muted)}
+.imp .src{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+.found{max-height:340px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+.found label{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:.92rem;overflow-wrap:anywhere}
 .imp .what{display:flex;flex-direction:column;gap:6px;min-width:0}
 .srcimg{width:100%;border-radius:10px;border:1px solid var(--line)}
 .chip.tagchip{background:var(--sunk);color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700}
@@ -406,6 +410,7 @@ h2{font-size:1.15rem;font-weight:700}
       <div class="row-btns">
         <button type="button" class="btn small" data-act="recipeNew">Neues Rezept</button>
         <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="url">Von Link importieren</button>
+        <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="links">Mehrere Links</button>
         <button type="button" class="btn small ghost" data-act="recipeTool" data-mode="text">Text umwandeln</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="ai">Von KI erfinden lassen</button>
         <button type="button" class="btn small ghost ai-only" data-act="recipeTool" data-mode="photo">Von Foto importieren</button>
@@ -413,7 +418,7 @@ h2{font-size:1.15rem;font-weight:700}
       <div id="recipeTool"></div>
     </div>
     <div class="section" id="importWrap" hidden>
-      <div class="section-head"><h2>Foto-Import</h2><span class="count" id="importCount"></span></div>
+      <div class="section-head"><h2>Import</h2><span class="count" id="importCount"></span></div>
       <div id="importsDyn"></div>
     </div>
     <div class="section">
@@ -508,6 +513,7 @@ h2{font-size:1.15rem;font-weight:700}
   const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3.2 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.2l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>';
   const SNOW = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 2 3-2M9 20l3-2 3 2"/></svg>';
   const PEN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
+  const LINK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
   const X = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
   const KIND = () => L({cook:"Kochen",leftovers:"Reste",flex:"Flexibel"},{cook:"Cook night",leftovers:"Leftovers",flex:"Flexible"});
 
@@ -971,6 +977,18 @@ h2{font-size:1.15rem;font-weight:700}
       setTimeout(()=>{ const i = $("toolInput"); if(i) i.focus(); }, 30);
       return;
     }
+    if(toolMode==="links"){
+      linkFind = {links:[], next:"", checked:new Set(), busy:false};
+      tool.innerHTML = '<form class="tool" id="linksForm" style="margin-top:10px" autocomplete="off">'+
+        '<label class="field">'+L('Links zu Rezepten (einer pro Zeile)','Links to recipes (one per line)')+'<textarea id="linksInput" rows="6" placeholder="https://…&#10;https://…"></textarea></label>'+
+        '<label class="field">'+L('Oder Rezepte auf einer Übersichtsseite suchen','Or find recipes on an overview page')+'<input id="listUrl" type="url" placeholder="'+L('Link zu einer Rezeptliste oder Suche','Link to a recipe list or search')+'"></label>'+
+        '<div class="row-btns"><button class="btn small ghost" type="button" data-act="findLinks">'+L('Rezepte auf der Seite suchen','Find recipes on the page')+'</button></div>'+
+        '<div id="foundLinks" class="stack" style="gap:8px"></div>'+
+        '<p class="muted" style="margin:0;font-size:.88rem">'+L('Die Seiten werden nacheinander mit einigen Sekunden Pause abgerufen; die Seite darf dabei geschlossen werden. Übernommen werden nur Titel, Zutaten, Zubereitung und Angaben wie Zeit und Portionen – keine Fotos. Die Rezepte bleiben privat auf deinem Server, der Link wird als Quelle gespeichert. Jedes Rezept erscheint unter „Import“ zum Prüfen.','Pages are fetched one after another with a few seconds’ pause; you can close the page meanwhile. Only the title, ingredients, steps and details such as time and servings are taken – no photos. The recipes stay private on your server, the link is kept as the source. Each recipe appears under “Import” for review.')+'</p>'+
+        '<div class="row-btns"><button class="btn small" type="submit">'+L('Importieren','Import')+'</button><button class="btn small ghost" type="button" data-act="recipeTool" data-mode="">'+L('Abbrechen','Cancel')+'</button></div></form>';
+      setTimeout(()=>{ const i = $("linksInput"); if(i) i.focus(); }, 30);
+      return;
+    }
     if(toolMode==="photo"){
       tool.innerHTML = '<form class="tool" id="photoForm" style="margin-top:10px" autocomplete="off">'+
         '<label class="field">'+L('Fotos von Rezeptseiten','Photos of recipe pages')+'<input id="photoInput" type="file" accept="image/*" multiple required></label>'+
@@ -997,14 +1015,18 @@ h2{font-size:1.15rem;font-weight:700}
     const errors = list.filter(i=>i.state==="error").length;
     $("importCount").textContent = [open?L(open+" zu prüfen",open+" to review"):"", pending?L(pending+" in Arbeit",pending+" in progress"):""].filter(Boolean).join(" · ");
     if(!list.length){ $("importsDyn").innerHTML = ""; return; }
-    $("importsDyn").innerHTML = (errors>1?'<div class="row-btns" style="margin-bottom:8px"><button type="button" class="btn small ghost" data-act="importRetryAll">'+L('Alle mit Fehler erneut versuchen','Retry all failed')+'</button></div>':'')+
+    const linkDone = list.filter(i=>i.kind==="link" && i.state==="done" && (i.recipes||[]).length).length;
+    const bulk = (linkDone>1?'<button type="button" class="btn small" data-act="importAcceptLinks">'+L('Alle '+linkDone+' Link-Rezepte ungeprüft übernehmen','Save all '+linkDone+' link recipes unreviewed')+'</button>':'')+
+      (errors>1?'<button type="button" class="btn small ghost" data-act="importRetryAll">'+L('Alle mit Fehler erneut versuchen','Retry all failed')+'</button>':'');
+    $("importsDyn").innerHTML = (bulk?'<div class="row-btns" style="margin-bottom:8px">'+bulk+'</div>':'')+
       '<div class="implist">'+list.map(i=>{
-        const img = '<img src="/api/imports/'+encodeURIComponent(i.id)+'/image/0" alt="" loading="lazy">';
+        const isLink = i.kind==="link";
+        const img = isLink ? '<div class="linkico">'+LINK+'</div>' : '<img src="/api/imports/'+encodeURIComponent(i.id)+'/image/0" alt="" loading="lazy">';
         const n = (i.images||[]).length, recs = i.recipes||[];
-        const pages = n>1 ? L(n+' Fotos',n+' photos')+' · ' : '';
+        const pages = isLink ? '<span class="src">'+esc((i.url||"").replace(/^https?:\/\/(www\.)?/,""))+'</span><br>' : n>1 ? L(n+' Fotos',n+' photos')+' · ' : '';
         let body;
         if(i.state==="waiting") body = '<span class="muted">'+pages+(i.message?esc(i.message):L('Wartet …','Waiting …'))+'</span>';
-        else if(i.state==="working") body = '<span>'+pages+'<b>'+L('Wird gelesen …','Reading …')+'</b></span>';
+        else if(i.state==="working") body = '<span>'+pages+'<b>'+(isLink?L('Wird abgerufen …','Fetching …'):L('Wird gelesen …','Reading …'))+'</b></span>';
         else if(i.state==="error") body = '<span class="muted">'+pages+L('Fehler: ','Error: ')+esc(i.message||"")+'</span>';
         else if(recs.length) body = '<span>'+pages+L(recs.length+' Rezept'+(recs.length>1?'e':'')+' gefunden',recs.length+' recipe'+(recs.length>1?'s':'')+' found')+'</span><div class="row-btns">'+
           recs.map((r,k)=>'<button type="button" class="btn small" data-act="importReview" data-id="'+esc(i.id)+'" data-i="'+k+'">'+L('Prüfen: ','Review: ')+esc(r.title)+'</button>').join("")+'</div>';
@@ -1047,6 +1069,42 @@ h2{font-size:1.15rem;font-weight:700}
       }
       toolMode = ""; $("recipeTool").innerHTML = "";
       toast(L("Fotos hochgeladen. Sie werden jetzt nacheinander gelesen.","Photos uploaded. They are now read one after another."));
+    }catch(e){ toast(e.message || L("Das hat nicht geklappt.","That didn’t work.")); }
+    finally{ toolBusy = false; renderRecipes(); }
+  }
+  // ---------- Mehrere Links ----------
+  let linkFind = null;        // {links:[{url,title}], next, checked:Set, busy}
+  function renderFoundLinks(){
+    const box = $("foundLinks"); if(!box || !linkFind) return;
+    const f = linkFind;
+    if(f.busy){ box.innerHTML = '<p class="muted" style="margin:0">'+L('Suche Rezepte …','Looking for recipes …')+'</p>'; return; }
+    if(!f.links.length){ box.innerHTML = f.searched ? '<p class="muted" style="margin:0">'+L('Auf dieser Seite wurden keine Rezept-Links gefunden.','No recipe links were found on this page.')+'</p>' : ''; return; }
+    box.innerHTML = '<span class="eyebrow">'+L(f.links.length+' gefunden · '+f.checked.size+' ausgewählt',f.links.length+' found · '+f.checked.size+' selected')+'</span>'+
+      '<div class="found">'+f.links.map((l,k)=>'<label class="check"><input type="checkbox" data-k="'+k+'"'+(f.checked.has(l.url)?' checked':'')+'><span>'+esc(l.title)+'<br><span class="muted" style="font-size:.8rem">'+esc(l.url.replace(/^https?:\/\//,""))+'</span></span></label>').join("")+'</div>'+
+      '<div class="row-btns"><button class="btn small ghost" type="button" data-act="linksAll">'+L('Alle','All')+'</button><button class="btn small ghost" type="button" data-act="linksNone">'+L('Keine','None')+'</button>'+
+      (f.next?'<button class="btn small ghost" type="button" data-act="findMore">'+L('Nächste Seite dazuladen','Load next page too')+'</button>':'')+'</div>';
+  }
+  async function findLinks(url){
+    if(!linkFind || linkFind.busy || !url) return;
+    linkFind.busy = true; renderFoundLinks();
+    try{
+      const r = await window.SB.api("POST", "/api/recipes/find-links", {url});
+      const known = new Set(linkFind.links.map(l=>l.url));
+      r.links.forEach(l=>{ if(!known.has(l.url)){ linkFind.links.push(l); linkFind.checked.add(l.url); } });
+      linkFind.next = r.next || "";
+    }catch(e){ toast(e.message); }
+    finally{ if(linkFind){ linkFind.busy = false; linkFind.searched = true; renderFoundLinks(); } }
+  }
+  async function importLinks(){
+    if(toolBusy) return;
+    const typed = ($("linksInput").value||"").split(/\s+/).map(s=>s.trim()).filter(s=>/^https?:\/\//i.test(s));
+    const urls = Array.from(new Set(typed.concat(linkFind ? linkFind.links.filter(l=>linkFind.checked.has(l.url)).map(l=>l.url) : [])));
+    if(!urls.length){ toast(L("Bitte Links eintragen oder auf einer Übersichtsseite auswählen.","Please enter links or pick them on an overview page.")); return; }
+    toolBusy = true; renderRecipes();
+    try{
+      const r = await window.SB.api("POST", "/api/imports/links", {urls});
+      toolMode = ""; linkFind = null; $("recipeTool").innerHTML = "";
+      toast(L(r.ids.length+" Links in der Warteschlange"+(r.skipped?" · "+r.skipped+" schon vorhanden":""),r.ids.length+" links queued"+(r.skipped?" · "+r.skipped+" already there":"")));
     }catch(e){ toast(e.message || L("Das hat nicht geklappt.","That didn’t work.")); }
     finally{ toolBusy = false; renderRecipes(); }
   }
@@ -1351,19 +1409,30 @@ h2{font-size:1.15rem;font-weight:700}
     else if(act==="recipeDelete"){ const r = S.recipes.find(x=>x.id===rOpen.id); if(r && confirm(L("„"+r.title+"“ aus der Rezeptdatenbank löschen?","Delete “"+r.title+"” from the recipe database?"))) save(()=>db.doc("recipes/"+r.id).delete(), L("Rezept gelöscht","Recipe deleted")).then(ok=>{ if(ok) closeRecipe(); }); }
     else if(act==="lang"){ const v = b.dataset.v; if(v!==LANG) save(()=>db.doc("plan/settings").set(Object.assign({}, S.settings||{}, {language:v}))).then(ok=>{ if(ok) setLang(v); }); }
     else if(act==="importReview") reviewImport(id, +b.dataset.i);
+    else if(act==="importAcceptLinks"){
+      const done = S.imports.filter(i=>i.kind==="link" && i.state==="done" && (i.recipes||[]).length);
+      if(confirm(L(done.length+" Rezepte ohne Prüfung in die Rezeptdatenbank übernehmen?","Save "+done.length+" recipes to the recipe database without reviewing them?")))
+        save(async()=>{ for(const i of done){ for(const r of i.recipes) await db.collection("recipes").add(Object.assign({}, r, {createdAt:new Date().toISOString()})); await window.SB.api("DELETE","/api/imports/"+encodeURIComponent(i.id)); } },
+          L(done.length+" Rezepte übernommen",done.length+" recipes saved"));
+    }
+    else if(act==="findLinks") findLinks(($("listUrl").value||"").trim());
+    else if(act==="findMore"){ if(linkFind && linkFind.next) findLinks(linkFind.next); }
+    else if(act==="linksAll"||act==="linksNone"){ if(linkFind){ linkFind.checked = new Set(act==="linksAll" ? linkFind.links.map(l=>l.url) : []); renderFoundLinks(); } }
     else if(act==="importRetry") window.SB.api("POST","/api/imports/"+encodeURIComponent(id)+"/retry").catch(e=>toast(e.message));
     else if(act==="importRetryAll") S.imports.filter(i=>i.state==="error").forEach(i=>window.SB.api("POST","/api/imports/"+encodeURIComponent(i.id)+"/retry").catch(e=>toast(e.message)));
-    else if(act==="importDiscard"){ if(confirm(L("Dieses Foto und die erkannten Rezepte verwerfen?","Discard this photo and the recipes found?"))) window.SB.api("DELETE","/api/imports/"+encodeURIComponent(id)).catch(e=>toast(e.message)); }
+    else if(act==="importDiscard"){ const imp = S.imports.find(i=>i.id===id); if(confirm(imp && imp.kind==="link" ? L("Diesen Link aus dem Import entfernen?","Remove this link from the import?") : L("Dieses Foto und die erkannten Rezepte verwerfen?","Discard this photo and the recipes found?"))) window.SB.api("DELETE","/api/imports/"+encodeURIComponent(id)).catch(e=>toast(e.message)); }
     else if(act==="recipeTool"){ toolMode = b.dataset.mode || ""; $("recipeTool").innerHTML = ""; renderRecipes(); }
   });
   document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if(rOpen) closeRecipe(); else if(openId) closeSheet(); } });
   $("rscrim").addEventListener("click", closeRecipe);
   document.addEventListener("change", e=>{
+    if(e.target.closest && e.target.closest("#foundLinks") && linkFind){ const l = linkFind.links[+e.target.dataset.k]; if(l){ if(e.target.checked) linkFind.checked.add(l.url); else linkFind.checked.delete(l.url); renderFoundLinks(); } return; }
     if(e.target.name==="aiMode" && rOpen && rOpen.mode==="ai"){ const w = $("aiWish"); if(w) rOpen.wish = w.value; rOpen.aiMode = e.target.value; renderRecipeSheet(); }
   });
   document.addEventListener("submit", e=>{
     if(e.target.id==="toolForm"){ e.preventDefault(); runTool(e.submitter); }
     else if(e.target.id==="photoForm"){ e.preventDefault(); uploadPhotos(e.target); }
+    else if(e.target.id==="linksForm"){ e.preventDefault(); importLinks(); }
     else if(e.target.id==="recipeForm"){ e.preventDefault(); saveRecipeForm(e.target, e.submitter && e.submitter.value==="new"); }
     else if(e.target.classList.contains("js-edit-stock")){
       e.preventDefault(); const f = e.target, id = f.dataset.id, name = f.elements.name.value.trim(); if(!name) return;
@@ -1422,7 +1491,7 @@ h2{font-size:1.15rem;font-weight:700}
     "Auf die nächste Einkaufsliste":"Add to the next shopping list",
     "z. B. Eier, Kaffee, Küchenrolle":"e.g. eggs, coffee, paper towels",
     "Artikel für die nächste Einkaufsliste":"Item for the next shopping list",
-    "Hinzufügen":"Add", "Demnächst":"Coming up", "Nächster Einkauf":"Next shop", "Artikel hinzufügen":"Add an item",
+    "Hinzufügen":"Add", "Mehrere Links":"Several links", "Demnächst":"Coming up", "Nächster Einkauf":"Next shop", "Artikel hinzufügen":"Add an item",
     "Bestand":"Stock",
     "Was zu Hause lagert – im Gefrierschrank, Kühlschrank, Vorratsschrank oder an einem eigenen Ort. Wird beim Planen zuerst verbraucht.":"What you keep at home – in the freezer, fridge, pantry or a place of your own. Used up first when planning.",
     "z. B. Hähnchenschenkel":"e.g. chicken thighs", "Neu im Bestand":"New in stock", "Menge":"Amount", "Lagerort":"Location",
@@ -1439,7 +1508,7 @@ h2{font-size:1.15rem;font-weight:700}
     "Feste Regeln für jeden Plan: Rhythmus, Allergien, was ihr nicht esst.":"Fixed rules for every plan: rhythm, allergies, what you don’t eat.",
     "Lade …":"Loading …", "Speichern":"Save", "Abbrechen":"Cancel", "Bearbeiten":"Edit", "Einrichtung":"Setup",
     "Rezepte, Zutaten oder Tags suchen":"Search recipes, ingredients or tags", "Rezepte durchsuchen":"Search recipes",
-    "Neues Rezept":"New recipe", "Von Link importieren":"Import from link", "Text umwandeln":"Convert text", "Von KI erfinden lassen":"Let the AI invent one", "Von Foto importieren":"Import from photo", "Foto-Import":"Photo import",
+    "Neues Rezept":"New recipe", "Von Link importieren":"Import from link", "Text umwandeln":"Convert text", "Von KI erfinden lassen":"Let the AI invent one", "Von Foto importieren":"Import from photo", "Import":"Import",
     "Eure Rezepte":"Your recipes", "Bereiche":"Sections", "Heute":"Today", "Einkauf":"Shopping", "Rezepte":"Recipes", "Vollbild":"Full screen",
     "Notizen":"Notes", "z. B. nächstes Mal mit Spaghettini":"e.g. try with thinner spaghetti next time", "Notiz zu diesem Gericht":"Note about this meal",
     "Keine Lust darauf?":"Not feeling this one?",
